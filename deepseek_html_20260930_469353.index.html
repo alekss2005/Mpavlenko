@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Карта тривог Києва (v14.21.0)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root{--bg:#e8eef4;--panel:rgba(255,255,255,.94);--text:#1e293b;--muted:#64748b;--accent:#2563eb;--danger:#dc2626}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);-webkit-tap-highlight-color:transparent}
+  #map{position:absolute;inset:0;z-index:1;background:#c9d6e3}
+  .hud-bottom{position:absolute;bottom:10px;left:8px;right:8px;z-index:1000;display:flex;flex-direction:column;gap:5px;align-items:stretch;pointer-events:none}
+  .hud-bottom>*{pointer-events:auto}
+  button{background:var(--panel);backdrop-filter:blur(10px);border:1px solid rgba(148,163,184,.5);color:var(--text);padding:7px 9px;border-radius:9px;font-size:1.05rem;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(15,23,42,.12);font-weight:700;min-width:40px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;touch-action:manipulation}
+  button:active{background:#dbeafe}
+  button.danger{color:#991b1b}
+  button.map-toggle.on{background:rgba(37,99,235,.9);color:#fff;border-color:rgba(37,99,235,.9)}
+  button.sound-btn.on{color:#16a34a}
+  button.sound-btn.muted{color:#dc2626}
+  button.rings-btn.on{color:#2563eb}
+  button.rings-btn.off{color:#94a3b8}
+  button.siren-btn{color:#b91c1c}
+  button.siren-btn.active{background:#dc2626!important;color:#fff!important;border-color:#7f1d1d!important;animation:sirenBtnFlash .35s ease-in-out infinite}
+  button.highprec-btn.on{background:rgba(234,88,12,.9);color:#fff;border-color:rgba(234,88,12,.9)}
+  @keyframes sirenBtnFlash{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.9)}50%{box-shadow:0 0 0 8px rgba(220,38,38,0)}}
+  .btn-row{display:flex;gap:5px;flex-wrap:nowrap;align-items:center;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  .btn-row::-webkit-scrollbar{height:0;display:none}
+  .attr{font-size:.58rem;color:var(--muted);line-height:1.35;background:var(--panel);backdrop-filter:blur(10px);border:1px solid rgba(148,163,184,.5);border-radius:6px;padding:4px 8px;max-width:100%}
+  .attr a{color:var(--accent);text-decoration:none}
+  .leaflet-popup-content-wrapper{background:rgba(15,23,42,.96);color:#e2e8f0;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid rgba(148,163,184,.25)}
+  .leaflet-popup-tip{background:rgba(15,23,42,.96)}
+  .leaflet-popup-content{margin:12px 14px;font-size:.85rem;line-height:1.45;max-width:320px}
+  .leaflet-popup-close-button{color:#cbd5e1!important;font-size:20px!important;padding:4px 8px!important}
+  .popup-title{font-weight:700;font-size:.95rem;margin-bottom:6px}
+  .popup-meta{color:#94a3b8;font-size:.75rem}
+  .type-uav{color:#f1f5f9}.type-missile,.type-ballistic{color:#f87171}.type-kab{color:#f87171}
+  .type-fpv{color:#fbbf24}.type-recon{color:#7dd3fc}.type-mig31k{color:#fb7185}
+  .type-banderol{color:#f87171}.type-launcher{color:#f87171}.type-jet_drone{color:#f87171}
+  .type-umpb{color:#fb923c}.type-strategic_aviation{color:#fb923c}.type-awacs{color:#38bdf8}.type-impact{color:#f87171}
+  .type-zircon{color:#dc2626;text-shadow:0 0 6px rgba(220,38,38,.5)}
+  .popup-guess{color:#fbbf24;font-size:.7rem;margin-top:6px}
+  .popup-advisory{background:rgba(3,105,161,.35);color:#bae6fd;padding:4px 8px;border-radius:6px;font-weight:700;font-size:.72rem;display:inline-block;margin-top:6px;border:1px solid rgba(125,211,252,.4)}
+  .popup-area{background:rgba(71,85,105,.4);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-weight:700;font-size:.72rem;display:inline-block;margin-top:6px;border:1px solid rgba(148,163,184,.4)}
+  .popup-alt{background:rgba(22,163,74,.25);color:#86efac;padding:4px 8px;border-radius:6px;font-weight:700;font-size:.75rem;display:inline-block;margin-top:6px;border:1px solid rgba(134,239,172,.4)}
+  .popup-channels{margin-top:8px;padding-top:6px;border-top:1px solid rgba(148,163,184,.15);font-size:.7rem}
+  .popup-channels .ch{display:inline-block;background:rgba(148,163,184,.2);color:#cbd5e1;padding:2px 7px;border-radius:10px;margin:2px 3px 2px 0;border:1px solid rgba(148,163,184,.3)}
+  .popup-channels .ch.trusted{background:rgba(22,163,74,.25);border-color:rgba(134,239,172,.4);color:#86efac}
+  .popup-channels .ch.suspicious{background:rgba(220,38,38,.25);border-color:rgba(248,113,113,.4);color:#fca5a5}
+  .popup-eta{background:rgba(220,38,38,.25);color:#fca5a5;padding:4px 8px;border-radius:6px;font-weight:700;font-size:.75rem;display:inline-block;margin-top:6px;border:1px solid rgba(248,113,113,.4)}
+  .popup-dist{background:rgba(59,130,246,.25);color:#93c5fd;padding:4px 8px;border-radius:6px;font-weight:700;font-size:.75rem;display:inline-block;margin-top:6px;border:1px solid rgba(147,197,253,.4)}
+  .popup-stale{background:rgba(217,119,6,.25);color:#fcd34d;padding:4px 8px;border-radius:6px;font-weight:700;font-size:.72rem;display:inline-block;margin-top:6px;border:1px solid rgba(251,191,36,.4)}
+  .popup-warning{background:rgba(220,38,38,.4);color:#fecaca;padding:6px 10px;border-radius:6px;font-weight:700;font-size:.75rem;display:block;margin-top:6px;border:1px solid rgba(248,113,113,.7);line-height:1.4}
+  .popup-dismiss-btn{display:inline-block;background:rgba(220,38,38,.9);color:#fff;padding:6px 12px;border-radius:6px;border:1px solid #7f1d1d;font-weight:800;font-size:.75rem;cursor:pointer;margin-top:8px}
+  .popup-dismiss-btn:hover{background:#b91c1c}
+  .threat-wrap{position:relative;width:28px;height:28px}
+  .threat-rotate{position:absolute;inset:0;transform-origin:center center;will-change:transform}
+  .threat-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+    filter:drop-shadow(0 1px 3px rgba(0,0,0,.4));transform-origin:center center;position:relative;
+    animation:flightPulse 1.6s ease-in-out infinite;transition:filter .3s ease}
+  .threat-icon svg{width:24px;height:24px;display:block}
+  @keyframes flightPulse{0%,100%{filter:drop-shadow(0 1px 3px rgba(0,0,0,.4));opacity:1}50%{filter:drop-shadow(0 0 8px rgba(37,99,235,.55));opacity:.92}}
+  .threat-icon.confirm-2{filter:drop-shadow(0 0 8px rgba(34,197,94,.85))}
+  .threat-icon.confirm-3{filter:drop-shadow(0 0 12px rgba(250,204,21,.95));animation:confirmPulse 1.4s ease-in-out infinite}
+  @keyframes confirmPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  .threat-icon.confirm-5{filter:drop-shadow(0 0 16px rgba(250,204,21,1));animation:confirmPulseStrong .95s ease-in-out infinite}
+  @keyframes confirmPulseStrong{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+  .threat-icon.observation{animation:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+  .threat-icon.advisory{animation:none;opacity:.75;filter:drop-shadow(0 1px 3px rgba(0,0,0,.3)) grayscale(.25)}
+  .threat-icon.area-only{opacity:.55;filter:grayscale(.5) drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+  .threat-icon.uncertain{opacity:.7}
+  .threat-icon.falling{animation:fallingBlink .55s ease-in-out infinite}
+  @keyframes fallingBlink{0%,100%{filter:drop-shadow(0 0 2px rgba(220,38,38,.9));opacity:1}50%{filter:drop-shadow(0 0 14px rgba(220,38,38,1));opacity:.35}}
+  .threat-icon.falling svg path,.threat-icon.falling svg polygon,.threat-icon.falling svg rect{fill:#dc2626!important;stroke:#7f1d1d!important}
+  .threat-icon.stale{opacity:.55;filter:grayscale(.4)}
+  .threat-icon.threat-pulse{animation:threatPulse 1s ease-in-out infinite}
+  @keyframes threatPulse{0%,100%{filter:drop-shadow(0 0 3px rgba(220,38,38,.9));opacity:1}50%{filter:drop-shadow(0 0 14px rgba(220,38,38,1));opacity:.55}}
+  .threat-icon.strat-pulse{animation:stratIconPulse 1.8s ease-in-out infinite}
+  @keyframes stratIconPulse{0%,100%{filter:drop-shadow(0 0 4px rgba(234,88,12,.8));opacity:1}50%{filter:drop-shadow(0 0 16px rgba(234,88,12,1));opacity:.7}}
+  .threat-icon.rocket-warning{animation:rocketWarningPulse .85s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(220,38,38,1))}
+  @keyframes rocketWarningPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  .threat-icon.uav-siren{animation:uavSirenPulse .7s ease-in-out infinite}
+  @keyframes uavSirenPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 6px rgba(251,191,36,.95))}50%{transform:scale(1.18);filter:drop-shadow(0 0 20px rgba(251,191,36,1)) drop-shadow(0 0 6px rgba(220,38,38,.9))}}
+  .threat-icon.ai-critical{animation:aiCriticalPulse 1.2s ease-in-out infinite}
+  @keyframes aiCriticalPulse{0%,100%{filter:drop-shadow(0 0 3px rgba(220,38,38,.9));opacity:1}50%{filter:drop-shadow(0 0 18px rgba(220,38,38,1));opacity:.6}}
+  .threat-icon.ballistic-alarm{animation:ballisticAlarmPulse .5s ease-in-out infinite}
+  @keyframes ballisticAlarmPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 6px rgba(220,38,38,1)) drop-shadow(0 0 12px rgba(220,38,38,.7))}50%{transform:scale(1.22);filter:drop-shadow(0 0 18px rgba(220,38,38,1)) drop-shadow(0 0 28px rgba(220,38,38,.9));opacity:.75}}
+  .impact-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;animation:impactPulse 1.1s ease-in-out infinite;transform-origin:center center}
+  .impact-icon svg{width:32px;height:32px;display:block;filter:drop-shadow(0 0 4px rgba(220,38,38,.9))}
+  @keyframes impactPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  .threat-icon .dir-arrow{position:absolute;top:-11px;left:50%;margin-left:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #111;filter:drop-shadow(0 0 1px #fff)}
+  .count-badge{position:absolute;right:-6px;top:-6px;height:16px;min-width:16px;padding:0 5px;border-radius:8px;background:#ea580c;color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);z-index:5}
+  .confirm-badge{position:absolute;left:-6px;top:-6px;height:14px;min-width:14px;padding:0 4px;border-radius:7px;background:#16a34a;color:#fff;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;border:1px solid #fff;z-index:5}
+  .confirm-badge::before{content:"✓"}
+  .confirm-badge.medium{background:#ca8a04}
+  .confirm-badge.low{background:#dc2626}
+  .confirm-badge.pending{background:#0ea5e9}
+  .confirm-badge.strong{background:linear-gradient(135deg,#facc15,#f59e0b);color:#78350f;font-size:10px;height:16px;min-width:16px;border-radius:8px}
+  .confirm-badge.strong::before{content:"★★"}
+  .confirm-badge.max{background:linear-gradient(135deg,#fde047,#f59e0b,#dc2626);color:#fff;font-size:10px;height:18px;min-width:18px;border-radius:9px;animation:maxBadgePulse 1s ease-in-out infinite}
+  @keyframes maxBadgePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+  .confirm-badge.max::before{content:"★★★"}
+  .leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.8)!important;color:#64748b!important}
+  .leaflet-control-attribution a{color:var(--accent)!important}
+  .toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:2000;background:#1e293b;color:#f1f5f9;padding:10px 16px;border-radius:10px;border:1px solid rgba(148,163,184,.4);font-size:.8rem;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  .ai-badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;border:1px solid;margin-top:6px;letter-spacing:.02em;white-space:nowrap}
+  .ai-modal-backdrop{position:fixed;inset:0;z-index:3000;background:rgba(15,23,42,.6);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px}
+  .ai-modal-backdrop.show{display:flex}
+  .ai-modal{background:rgba(15,23,42,.98);color:#e2e8f0;border:1px solid rgba(148,163,184,.3);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);max-width:520px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;animation:aiModalIn .25s ease-out}
+  @keyframes aiModalIn{from{transform:translateY(20px) scale(.95);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+  .ai-modal-header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(148,163,184,.2);background:linear-gradient(90deg,rgba(3,105,161,.3),rgba(15,23,42,.3))}
+  .ai-modal-header .ai-modal-icon{font-size:1.4rem}
+  .ai-modal-header .ai-modal-title{flex:1;font-weight:700;font-size:1rem;color:#e2e8f0}
+  .ai-modal-close{background:transparent;border:0;color:#94a3b8;font-size:1.6rem;line-height:1;cursor:pointer;padding:0 6px;font-weight:400}
+  .ai-modal-close:hover{color:#e2e8f0}
+  .ai-modal-body{padding:14px 16px;overflow-y:auto;font-size:.9rem;line-height:1.55;white-space:pre-wrap;word-wrap:break-word;-webkit-overflow-scrolling:touch}
+  .ai-modal-footer{padding:10px 16px;border-top:1px solid rgba(148,163,184,.2);display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:#94a3b8;gap:8px;flex-wrap:wrap}
+  .ai-modal-footer button{font-size:.8rem;padding:6px 12px}
+  .popup-trail{margin-top:8px;padding:8px 10px;border-radius:6px;background:rgba(148,163,184,.12);border:1px dashed rgba(148,163,184,.5);font-size:.72rem;line-height:1.5;color:#cbd5e1}
+  .popup-trail .pt-title{font-weight:700;color:#e2e8f0;margin-bottom:4px}
+  .popup-trail .pt-point{display:flex;gap:6px;align-items:flex-start;margin:2px 0}
+  .popup-trail .pt-num{flex-shrink:0;font-family:ui-monospace,monospace;color:#94a3b8;min-width:16px}
+  .popup-trail .pt-place{flex:1;color:#e2e8f0}
+  .popup-trail .pt-time{color:#94a3b8;font-size:.65rem;margin-left:4px}
+  .popup-trail .pt-arrow{color:#fbbf24;font-weight:800}
+  .live-badge{position:absolute;top:12px;right:12px;z-index:1000;padding:4px 10px;border-radius:8px;font-size:.7rem;font-weight:800;background:var(--panel);border:1px solid rgba(148,163,184,.5);backdrop-filter:blur(10px);box-shadow:0 2px 8px rgba(15,23,42,.12)}
+  .live-badge.live{color:#16a34a}.live-badge.stale{color:#dc2626}.live-badge.ws{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.5)}
+  .impact-marker-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,120,0,.95)) drop-shadow(0 0 2px rgba(220,38,38,1));animation:impactPop .9s ease-in-out infinite;transform-origin:center center}
+  @keyframes impactPop{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.18) rotate(6deg);opacity:.85}}
+  .popup-warning-list{list-style:none;padding:0;margin:6px 0 0}
+  .popup-warning-list li{padding:3px 0;font-size:.72rem;color:#fecaca;line-height:1.35}
+  .popup-warning-list li::before{content:"• ";color:#f87171;font-weight:900}
+  .warning-marker-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:36px;line-height:1;filter:drop-shadow(0 0 10px rgba(220,38,38,1)) drop-shadow(0 0 4px rgba(250,204,21,.9));animation:warningPulse 1s ease-in-out infinite;transform-origin:center center;cursor:pointer}
+  @keyframes warningPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.25);opacity:.85}}
+  .warnings-panel{position:absolute;top:48px;right:12px;z-index:999;background:rgba(15,23,42,.96);color:#e2e8f0;border:1px solid rgba(220,38,38,.5);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);backdrop-filter:blur(10px);max-width:300px;min-width:200px;font-size:.78rem;display:none;overflow:hidden}
+  .warnings-panel.show{display:block}
+  .warnings-panel.collapsed .warnings-list{display:none}
+  .warnings-header{display:flex;align-items:center;gap:6px;padding:8px 12px;background:linear-gradient(90deg,rgba(220,38,38,.55),rgba(15,23,42,.35));cursor:pointer;user-select:none;font-weight:800;color:#fecaca}
+  .warnings-header .warnings-count{background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:.72rem;margin-left:auto}
+  .warnings-header .warnings-chev{font-size:.85rem;transition:transform .2s ease}
+  .warnings-panel.collapsed .warnings-chev{transform:rotate(-90deg)}
+  .warnings-list{max-height:40vh;overflow-y:auto;padding:4px 0}
+  .warnings-list .w-item{display:flex;gap:8px;align-items:flex-start;padding:8px 12px;border-bottom:1px solid rgba(148,163,184,.15)}
+  .warnings-list .w-item:last-child{border-bottom:0}
+  .warnings-list .w-item-body{flex:1;min-width:0}
+  .warnings-list .w-item-label{font-weight:700;color:#fca5a5;font-size:.78rem;line-height:1.25}
+  .warnings-list .w-item-detail{color:#cbd5e1;font-size:.68rem;margin-top:3px;line-height:1.35}
+  .warnings-list .w-item-meta{color:#94a3b8;font-size:.65rem;margin-top:3px}
+  .warnings-list .w-item-close{background:transparent;border:0;color:#f87171;font-size:1.1rem;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0}
+  .warnings-list .w-item-close:hover{color:#fecaca}
+  .impact-marker{width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:26px;line-height:1;cursor:pointer}
+  .impact-marker.hit{animation:impactHit 1s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(220,38,38,1)) drop-shadow(0 0 4px rgba(250,204,21,.9))}
+  .impact-marker.down{animation:impactDown 1.2s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(251,146,60,1))}
+  .impact-marker.shot{animation:impactShot 1.2s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(34,197,94,1))}
+  .impact-marker.fire{animation:impactFire 1.1s ease-in-out infinite;filter:drop-shadow(0 0 14px rgba(249,115,22,1))}
+  .impact-marker svg{width:30px;height:30px;display:block}
+  @keyframes impactHit{0%,100%{transform:scale(1)}50%{transform:scale(1.25);opacity:.85}}
+  @keyframes impactDown{0%,100%{transform:scale(1)}50%{transform:scale(1.15);opacity:.7}}
+  @keyframes impactShot{0%,100%{transform:scale(1)}50%{transform:scale(1.18);opacity:.8}}
+  @keyframes impactFire{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
+  .err-banner{position:absolute;top:0;left:0;right:0;z-index:5000;background:#b91c1c;color:#fff;padding:10px 14px;font-size:.8rem;line-height:1.4;box-shadow:0 4px 12px rgba(0,0,0,.3);display:none}
+  .err-banner.show{display:block}
+  .err-banner b{font-weight:800}
+  .err-banner .err-close{float:right;background:transparent;border:0;color:#fff;font-size:1.2rem;cursor:pointer;padding:0 6px;line-height:1}
+  .alert-polygon{stroke-width:1.5;fill-opacity:.15}
+  .ballistic-banner{position:absolute;top:0;left:0;right:0;z-index:4500;background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d);color:#fff;padding:10px 16px;font-size:.85rem;font-weight:800;text-align:center;letter-spacing:.03em;box-shadow:0 4px 20px rgba(220,38,38,.6);display:none;animation:ballisticBanner .5s ease-in-out infinite}
+  .ballistic-banner.show{display:block}
+  @keyframes ballisticBanner{0%,100%{background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d)}50%{background:linear-gradient(90deg,#dc2626,#fca5a5,#dc2626)}}
+  .uncertainty-circle{stroke-dasharray:6 5}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="live-badge" id="liveBadge">офлайн</div>
+
+<div class="ballistic-banner" id="ballisticBanner">🚨 УВАГА! ЗАГРОЗА БАЛІСТИКИ / ЦИРКОН 🚨</div>
+
+<div class="err-banner" id="errBanner">
+  <button class="err-close" onclick="this.parentNode.classList.remove('show')">×</button>
+  <b>Помилка:</b> <span id="errText">—</span>
+</div>
+
+<div class="warnings-panel" id="warningsPanel">
+  <div class="warnings-header" id="warningsHeader">
+    <span>⚠️ Попередження</span>
+    <span class="warnings-count" id="warningsCount">0</span>
+    <span class="warnings-chev">▼</span>
+  </div>
+  <div class="warnings-list" id="warningsList"></div>
+</div>
+
+<div class="hud-bottom">
+  <div class="btn-row">
+    <button type="button" id="btnRefresh" title="Оновити">↻</button>
+    <button type="button" id="btnAIExplain" title="AI-зведення">🤖</button>
+    <button type="button" class="map-toggle" id="btnMapToggle" title="Схема/Супутник">🛰</button>
+    <button type="button" id="btnColorToggle" title="Колір БПЛА">🎨</button>
+    <button type="button" class="rings-btn on" id="btnRingsToggle" title="Кола 250/120 км">🎯</button>
+    <button type="button" class="sound-btn on" id="soundToggle" title="Звук (тап = тест)">🔔</button>
+    <button type="button" class="siren-btn" id="sirenBtn" title="Сирена (тест 3 сек)">🚨</button>
+    <button type="button" class="highprec-btn" id="btnHighPrec" title="Тільки висока точність">🎯+</button>
+    <button type="button" id="btnClear" class="danger" title="Очистити">✕</button>
+  </div>
+  <div class="attr">
+    Дані: <a href="https://neptun.in.ua/" target="_blank" rel="noopener">NEPTUN</a>.
+    Тайли: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OSM</a> ·
+    <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>.
+    v14.21.0 · БПЛА · Циркон · 7 ЦОД · балістика · fuzzy · merge.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="ai-modal-backdrop" id="aiModalBackdrop">
+  <div class="ai-modal" role="dialog" aria-modal="true">
+    <div class="ai-modal-header">
+      <span class="ai-modal-icon" id="aiModalIcon">🤖</span>
+      <span class="ai-modal-title" id="aiModalTitle">Зведення обстановки · AI Lite</span>
+      <button class="ai-modal-close" id="aiModalClose" aria-label="Закрити">×</button>
+    </div>
+    <div class="ai-modal-body" id="aiModalBody">—</div>
+    <div class="ai-modal-footer">
+      <span id="aiModalTime">—</span>
+      <button type="button" id="aiModalCopy">📋 Копіювати</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+/* ============================================================
+   ХЕЛПЕРИ + v14.21.0
+============================================================ */
+const $ = id => document.getElementById(id);
+const esc = s => (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function showErr(msg){
+  try{
+    const b=document.getElementById("errBanner");
+    const t=document.getElementById("errText");
+    if(b&&t){t.textContent=String(msg||"невідома помилка");b.classList.add("show");}
+    console.error("[kyiv-map error]",msg);
+  }catch(e){}
+}
+window.addEventListener("error",(ev)=>{ showErr((ev&&ev.message)||"помилка скрипта"); });
+window.addEventListener("unhandledrejection",(ev)=>{ try{showErr((ev.reason&&ev.reason.message)||String(ev.reason));}catch(e){} });
+
+/* kyivAreas */
+const kyivAreas = [
+  { id:"holosiiv", name:"Голосіїв", district:"Голосіївський", bank:"right", lat:50.4050, lng:30.5090, radius:2200 },
+  { id:"teremky_1", name:"Теремки-1", district:"Голосіївський", bank:"right", lat:50.3666, lng:30.4586, radius:1800 },
+  { id:"solomianka", name:"Солом'янка", district:"Солом'янський", bank:"right", lat:50.4250, lng:30.4750, radius:1900 },
+  { id:"vidradnyi", name:"Відрадний", district:"Солом'янський", bank:"right", lat:50.4390, lng:30.4500, radius:1700 },
+  { id:"zhuliany", name:"Жуляни", district:"Солом'янський", bank:"right", lat:50.4000, lng:30.4400, radius:2000 },
+  { id:"sviatoshyn", name:"Святошин", district:"Святошинський", bank:"right", lat:50.4560, lng:30.3910, radius:1800 },
+  { id:"akademmistechko", name:"Академмістечко", district:"Святошинський", bank:"right", lat:50.4640, lng:30.3560, radius:1500 },
+  { id:"nyvky", name:"Нивки", district:"Святошинський", bank:"right", lat:50.4590, lng:30.4000, radius:1500 },
+  { id:"lukianivka", name:"Лук'янівка", district:"Шевченківський", bank:"right", lat:50.4620, lng:30.4820, radius:1300 },
+  { id:"shuliavka", name:"Шулявка", district:"Шевченківський", bank:"right", lat:50.4470, lng:30.4550, radius:1500 },
+  { id:"center", name:"Центр", district:"Шевченківський", bank:"right", lat:50.4470, lng:30.5220, radius:1800 },
+  { id:"podil", name:"Поділ", district:"Подільський", bank:"right", lat:50.4630, lng:30.5150, radius:1600 },
+  { id:"vynohradar", name:"Виноградар", district:"Подільський", bank:"right", lat:50.5100, lng:30.4300, radius:1900 },
+  { id:"obolon", name:"Оболонь", district:"Оболонський", bank:"right", lat:50.5120, lng:30.5000, radius:2200 },
+  { id:"minskyi", name:"Мінський масив", district:"Оболонський", bank:"right", lat:50.5250, lng:30.4550, radius:1800 },
+  { id:"pechersk", name:"Печерськ", district:"Печерський", bank:"right", lat:50.4250, lng:30.5400, radius:1600 },
+  { id:"livoberezhnyi", name:"Лівобережний масив", district:"Дніпровський", bank:"left", lat:50.4550, lng:30.5980, radius:1800 },
+  { id:"rusanivka", name:"Русанівка", district:"Дніпровський", bank:"left", lat:50.4380, lng:30.5940, radius:1300 },
+  { id:"berezniaky", name:"Березняки", district:"Дніпровський", bank:"left", lat:50.4210, lng:30.5960, radius:1700 },
+  { id:"troieshchyna", name:"Троєщина", district:"Деснянський", bank:"left", lat:50.5150, lng:30.6100, radius:3000 },
+  { id:"lisovyi", name:"Лісовий масив", district:"Деснянський", bank:"left", lat:50.4750, lng:30.6350, radius:2000 },
+  { id:"pozniaky", name:"Позняки", district:"Дарницький", bank:"left", lat:50.4110, lng:30.6300, radius:2200 },
+  { id:"osokorky", name:"Осокорки", district:"Дарницький", bank:"left", lat:50.3929, lng:30.6360, radius:2200 },
+  { id:"kharkivskyi", name:"Харківський масив", district:"Дарницький", bank:"left", lat:50.4050, lng:30.6450, radius:2000 },
+  { id:"bortnychi", name:"Бортничі", district:"Дарницький", bank:"left", lat:50.3470, lng:30.6750, radius:3000 },
+  { id:"maidan", name:"Майдан Незалежності", district:"Шевченківський", bank:"right", lat:50.4501, lng:30.5234, radius:600 },
+  { id:"khreshchatyk", name:"Хрещатик", district:"Шевченківський", bank:"right", lat:50.4475, lng:30.5220, radius:800 },
+  { id:"vyshneve", name:"Вишневе", district:"Києво-Святошинський", bank:"right", lat:50.3900, lng:30.3700, radius:1800 },
+  { id:"irpin", name:"Ірпінь", district:"Києво-Святошинський", bank:"right", lat:50.5200, lng:30.2500, radius:2000 },
+  { id:"bucha", name:"Буча", district:"Києво-Святошинський", bank:"right", lat:50.5500, lng:30.2200, radius:2000 },
+  { id:"brovary", name:"Бровари", district:"Броварський", bank:"left", lat:50.5100, lng:30.7900, radius:2500 },
+  { id:"boryspil", name:"Бориспіль", district:"Бориспільський", bank:"left", lat:50.3500, lng:30.9500, radius:2500 },
+  { id:"vasylkiv", name:"Васильків", district:"Васильківський", bank:"right", lat:50.1800, lng:30.3200, radius:2000 },
+  { id:"obukhiv", name:"Обухів", district:"Обухівський", bank:"right", lat:50.1000, lng:30.6200, radius:2000 },
+  { id:"fastiv", name:"Фастів", district:"Фастівський", bank:"right", lat:50.0700, lng:29.9200, radius:2000 },
+  { id:"bila_tserkva", name:"Біла Церква", district:"Білоцерківський", bank:"right", lat:49.7900, lng:30.1100, radius:2500 },
+  { id:"rybalskyi", name:"Рибальський острів", district:"Подільський", bank:"right", lat:50.4710, lng:30.5320, radius:600 },
+  { id:"pivdennyi_mist", name:"Південний міст", district:"Голосіївський", bank:"right", lat:50.3940, lng:30.5870, radius:400 },
+  { id:"kurchatovo", name:"Курчатово", district:"Деснянський", bank:"left", lat:50.4880, lng:30.6050, radius:900 },
+  { id:"arsenalna", name:"Арсенальна", district:"Печерський", bank:"right", lat:50.4430, lng:30.5450, radius:500 },
+  { id:"metro_arsenalna", name:"Метро Арсенальна", district:"Печерський", bank:"right", lat:50.4430, lng:30.5450, radius:400 },
+  { id:"livyi_bereg", name:"Лівий берег", district:"Дніпровський", bank:"left", lat:50.4500, lng:30.6000, radius:2500 },
+  { id:"pravyi_bereg", name:"Правий берег", district:"Шевченківський", bank:"right", lat:50.4500, lng:30.5100, radius:2500 },
+  { id:"chernihivshchyna", name:"Чернігівщина", district:"Чернігівська", bank:"left", lat:51.5000, lng:31.2900, radius:15000 }
+];
+window.kyivAreas = kyivAreas;
+
+/* ============================================================
+   КОНФІГ v14.21.0
+============================================================ */
+const CONFIG = {
+  API_THREATS:  "https://neptun.in.ua/api/v1/threats",
+  API_ALERTS:   "https://neptun.in.ua/api/v1/alerts",
+  API_MESSAGES: "https://neptun.in.ua/api/v1/messages",
+  WS_URL:       "wss://neptun.in.ua/api/v1/stream",
+  POLL_MS: 5000,
+  WS_RECONNECT_MS: 3000,
+  WS_RECONNECT_MAX_MS: 60000,
+  KYIV: [50.45, 30.52],
+  ZONE_RADIUS_KM: 250,
+  KYIV_OBLAST_RADIUS_KM: 120,
+  KYIV_OBLAST_CENTER: [50.45, 30.52],
+  STALE_MSG_MS: 5 * 60 * 1000,
+  IMPACT_TTL_MS: 30 * 60 * 1000,
+  IMPACT_REPORT_TTL_MS: 30 * 60 * 1000,
+  LAUNCHER_SOLO_TTL_MS: 5 * 60 * 1000,
+  MIN_CHANNELS_CONFIRM: 2,
+  BALLISTIC_SOLO_OK: true,
+  EXTRAPOLATION_HOURS: 0.33,
+  STALE_VISUAL_AFTER_HOURS: 0.5,
+  MIG_SHOW_OUTSIDE_ZONE: true,
+  STRAT_SHOW_OUTSIDE_ZONE: true,
+  TRAIL_MIN_ORIGIN_DIST_KM: 30,
+  UNCERTAIN_KM: 20,
+  TILE_URL: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  TILE_URL_SAT: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  TILE_URL_SAT_REF: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  TILE_ATTR: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://www.esri.com/">Esri</a>',
+  TILE_ATTR_SAT: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+  APPROACH_OFFSET_KM: 20,
+  FALLBACK_SPEED: {
+    uav:180, recon:120, fpv:80, missile:900, ballistic:2100, banderol:700,
+    jet_drone:750, kab:400, umpb:500, mig31k:900, awacs:700,
+    strategic_aviation:800, unknown:150, geran5:180, zircon:2500
+  },
+  SPEED_BY_HINT: {
+    "шахед":180,"shahed":180,"герань":180,"geran":180,
+    "циркон":2500,"zircon":2500,"3м22":2500,"3m22":2500,
+    "кинжал":12300,"кінжал":12300,"kinzhal":12300,
+    "искандер":2100,"іскандер":2100,"iskander":2100,
+    "калибр":890,"калібр":890,"kalibr":890,
+    "х-101":900,"х-555":900,"x-101":900,"х-59":1050,"x-59":1050,
+    "с-300":4200,"с-400":4800,"кн-23":2100,"kn-23":2100,
+    "оникс":3000,"oniks":3000,
+    "s-8000":700,"бандероль":700,"banderol":700,"умпб":500,"umpb":500
+  },
+  ALTITUDE_CHANNELS: ["chyste_nebo","chistenebo","чистенебо"],
+  AI_VOICE_ENABLED: false,
+  AI_CRITICAL_NEAR_KM: 100,
+  SOUND_ENABLED: true,
+  SOUND_NEAR_KM: 20,
+  SOUND_NEAR_KM_ROCKET: 30,
+  SOUND_NEAR_WINDOW_MS: 10000,
+  SOUND_NEAR_WINDOW_MS_ROCKET: 5000,
+  SOUND_COOLDOWN_MS: 4000,
+  SOUND_TYPE_FILTER: new Set(["uav","recon","geran5","missile","ballistic","banderol","jet_drone","kab","umpb","zircon"]),
+  ROCKET_TYPES: new Set(["missile","ballistic","banderol","jet_drone","kab","umpb","zircon"]),
+  ROCKET_ONLY_KYIV_OBLAST: true,
+  ROCKET_WARNING_TYPES: new Set(["missile","ballistic","banderol","jet_drone","kab","umpb","zircon"]),
+  TRAIL_MAX_AGE_MS: 30 * 60 * 1000,
+  TRAIL_MAX_GAP_KM: 35,
+  TRAIL_MAX_POINTS: 12,
+  TRAIL_COLOR: "#dc2626",
+  TRAIL_LINE_WIDTH: 2,
+  TARGET_TTL_AFTER_ARRIVAL_MS: 30 * 1000,
+  API_TRAIL_MAX_POINTS: 8,
+  API_TRAIL_MIN_GAP_KM: 0.3,
+  WARNING_GRACE_MS: 60 * 60 * 1000,
+  BALLISTIC_SIREN_COOLDOWN_MS: 2 * 60 * 1000
+};
+
+const OBSERVATION_TYPES = new Set(["banderol","jet_drone"]);
+
+/* EXTRA_PLACES + findExtraPlace */
+const EXTRA_PLACES = {
+  "бимобайл":[50.49377489371717,30.475638025446578,"ЦОД «Бимобайл»"],
+  "bimobile":[50.49377489371717,30.475638025446578,"ЦОД «Бимобайл»"],
+  "бимо":[50.49377489371717,30.475638025446578,"ЦОД «Бимобайл»"],
+  "vodofon":[50.45550692298903,30.43707934850671,"ЦОД «Vodafone»"],
+  "водофон":[50.45550692298903,30.43707934850671,"ЦОД «Vodafone»"],
+  "водофоне":[50.45550692298903,30.43707934850671,"ЦОД «Vodafone»"],
+  "дрим\\s*лайн":[50.42435775898872,30.5206141327682,"ЦОД «Дрим Лайн»"],
+  "дрім\\s*лайн":[50.42435775898872,30.5206141327682,"ЦОД «Дрим Лайн»"],
+  "dream\\s*line":[50.42435775898872,30.5206141327682,"ЦОД «Дрим Лайн»"],
+  "дримлайн":[50.42435775898872,30.5206141327682,"ЦОД «Дрим Лайн»"],
+  "киевстар":[50.459200103253046,30.42669420361142,"ЦОД «Киевстар»"],
+  "київстар":[50.459200103253046,30.42669420361142,"ЦОД «Киевстар»"],
+  "kyivstar":[50.459200103253046,30.42669420361142,"ЦОД «Киевстар»"],
+  "омега":[50.447433860889056,30.429333062811796,"ЦОД «Омега»"],
+  "omega":[50.447433860889056,30.429333062811796,"ЦОД «Омега»"],
+  "укр\\s*спец\\s*систем":[50.46880677465512,30.46626296312456,"ЦОД «УКР Спец Систем»"],
+  "укрспецсистем":[50.46880677465512,30.46626296312456,"ЦОД «УКР Спец Систем»"],
+  "спецсистем":[50.46880677465512,30.46626296312456,"ЦОД «УКР Спец Систем»"],
+  "укр\\s*телеком":[50.46880677465512,30.46626296312456,"ЦОД «УкрТелеком»"],
+  "укртелеком":[50.46880677465512,30.46626296312456,"ЦОД «УкрТелеком»"],
+  "південний міст":[50.3940,30.5870,"Південний міст"],
+  "южный мост":[50.3940,30.5870,"Южный мост"],
+  "нижні сади":[50.3850,30.6600,"Нижні сади"],
+  "нижние сады":[50.3850,30.6600,"Нижние сады"],
+  "почайна":[50.4870,30.5160,"Почайна"],
+  "куренивка":[50.4800,30.4850,"Куренівка"],
+  "курінівка":[50.4800,30.4850,"Куренівка"],
+  "стоянка":[50.4200,30.4500,"Стоянка"],
+  "водосховище":[50.500,30.570,"Водосховище"],
+  "водохранилище":[50.500,30.570,"Водохранилище"],
+  "проспект микол[иі] бажана":[50.3980,30.6300,"Пр. Бажана"],
+  "бажана":[50.3980,30.6300,"Пр. Бажана"],
+  "центральна вулиця":[50.3850,30.6600,"Центральна вул."],
+  "теличка":[50.3940,30.5720,"Теличка"],
+  "видубичі":[50.4100,30.5630,"Видубичі"],
+  "рибальський\\s*острів":[50.4710,30.5320,"Рибальський острів"],
+  "рыбальский\\s*остров":[50.4710,30.5320,"Рибальський острів"],
+  "курчатово":[50.4880,30.6050,"Курчатово"],
+  "курчатове":[50.4880,30.6050,"Курчатово"],
+  "арсенальна":[50.4430,30.5450,"Арсенальна"],
+  "метро\\s+арсенальна":[50.4430,30.5450,"Метро Арсенальна"],
+  "лівий\\s+берег":[50.4500,30.6000,"Лівий берег"],
+  "левый\\s+берег":[50.4500,30.6000,"Лівий берег"],
+  "правий\\s+берег":[50.4500,30.5100,"Правий берег"],
+  "правый\\s+берег":[50.4500,30.5100,"Правий берег"],
+  "чернігівщина":[51.5000,31.2900,"Чернігівщина"],
+  "черниговщина":[51.5000,31.2900,"Чернігівщина"]
+};
+function findExtraPlace(text){
+  if(!text)return null;
+  const low=text.toLowerCase().replace(/[’`´']/g,"'");
+  let best=null;
+  for(const key of Object.keys(EXTRA_PLACES)){
+    const re=new RegExp(key,"i");
+    const idx=low.search(re);
+    if(idx<0)continue;
+    if(!best||idx<best.index){
+      const arr=EXTRA_PLACES[key];
+      best={key:"extra:"+key,name:arr[2],lat:arr[0],lon:arr[1],index:idx,length:key.length};
+    }
+  }
+  return best;
+}
+
+/* ============================================================
+   v14.21.0: Fuzzy matching
+============================================================ */
+function levenshtein(a, b) {
+  a = (a||"").toLowerCase(); b = (b||"").toLowerCase();
+  const m = a.length, n = b.length;
+  if(m===0)return n; if(n===0)return m;
+  const dp = Array.from({length: m + 1}, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+function normalizePlaceName(s) {
+  return (s || "")
+    .toLowerCase()
+    .replace(/[’`´']/g, "'")
+    .replace(/\b(район|масив|мікрорайон|мкр|вул\.?|просп\.?|пл\.?)\b/gi, "")
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function findPlaceFuzzy(text, threshold = 0.72) {
+  if (!text) return null;
+  const exact = findPlaceInText(text) || findExtraPlace(text) || findKyivAreaInText(text);
+  if (exact) return exact;
+  const low = normalizePlaceName(text);
+  let best = null, bestScore = 0;
+  const candidates = [];
+  for (const area of kyivAreas) {
+    candidates.push({ key: "kyiv_area:" + area.id, name: area.name, lat: area.lat, lon: area.lng, norm: normalizePlaceName(area.name) });
+  }
+  for (const [key, arr] of Object.entries(PLACES||{})) {
+    candidates.push({ key, name: arr[2], lat: arr[0], lon: arr[1], norm: normalizePlaceName(arr[2]) });
+  }
+  for (const [key, arr] of Object.entries(EXTRA_PLACES)) {
+    candidates.push({ key: "extra:" + key, name: arr[2], lat: arr[0], lon: arr[1], norm: normalizePlaceName(arr[2]) });
+  }
+  for (const c of candidates) {
+    if (c.norm.length < 3) continue;
+    if (low.includes(c.norm)) {
+      if (0.95 > bestScore) { bestScore = 0.95; best = c; }
+      continue;
+    }
+    const dist = levenshtein(low.slice(0, Math.min(low.length, c.norm.length + 4)), c.norm);
+    const maxLen = Math.max(low.length, c.norm.length);
+    const score = 1 - dist / maxLen;
+    if (score >= threshold && score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  if (!best) return null;
+  return {
+    key: best.key, name: best.name, lat: best.lat, lon: best.lon,
+    fuzzyScore: Math.round(bestScore * 100) / 100, _fuzzy: true
+  };
+}
+
+/* ============================================================
+   v14.21.0: Uncertainty circles
+============================================================ */
+const uncertaintyCircles = new Map();
+function showUncertainty(key, lat, lon, radiusKm, color = "#f59e0b") {
+  if (!map || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  const r = Math.max(400, Math.min((radiusKm||5) * 1000, 8000));
+  let circle = uncertaintyCircles.get(key);
+  if (circle) {
+    try { circle.setLatLng([lat, lon]).setRadius(r); } catch(e){}
+  } else {
+    circle = L.circle([lat, lon], {
+      radius: r, color, weight: 1.5, opacity: 0.7,
+      fillColor: color, fillOpacity: 0.12, dashArray: "6 5",
+      interactive: false, className: "uncertainty-circle"
+    }).addTo(msgThreatLayer || map);
+    uncertaintyCircles.set(key, circle);
+  }
+}
+function removeUncertainty(key) {
+  const c = uncertaintyCircles.get(key);
+  if (c) {
+    try { (msgThreatLayer || map).removeLayer(c); } catch(e){}
+    uncertaintyCircles.delete(key);
+  }
+}
+
+/* ============================================================
+   Решта хелперів
+============================================================ */
+const CHANNEL_WEIGHTS = {
+  "deraketaua":2.0,"war_raketaua":1.8,"monitorwarr":1.8,"ukrainar":1.8,
+  "ua_rockets":1.5,"vibuxaviasia":1.5,"monitor_ukr":1.5,"mon1tor_ua":1.3,
+  "radar_raketaa":1.3,"kpszsu":1.5,"povitryana_rozvidka":1.3,"zaxidniy_control":1.3,
+  "veselyy_pivden":1.2,"ukrainesradar":1.3,"war_monitor":1.2,"Ukraine_UA_24_7":1.3,
+  "kiev_nebo":1.2,"kievreal1":1.1,"kyiv_vanek":1.1,"k_dvizh":1.0,"kyiv_golovne":1.2,
+  "avia_radar_info":1.2,"kiev_levyy_bereg":1.0,"kiev_tryvoha":1.2,"monikppy":1.2,
+  "vybuhy_bavovna":1.3,"praviy_bereg_kiev":1.0,"operinform":1.2,"kievinform_ua1":1.0,
+  "chernigov_chernigiv1":1.1,"kievinfo_kyiv":1.1,"tryvoga_chomu":1.0,
+  "monitoringwarua":1.3,"chyste_nebo":1.4,"monitoring_ukrainian":1.2,"kyiv_oper":1.1,
+  "monitor_war_ua":1.2,"ukraine_24_7":1.1,"eradarrua":1.3,"повітряні сили зсу":1.5
+};
+function channelWeight(name){
+  const k=(name||"").replace(/^@/,"").toLowerCase().trim();
+  if(CHANNEL_WEIGHTS[k]!=null)return CHANNEL_WEIGHTS[k];
+  for(const[key,w]of Object.entries(CHANNEL_WEIGHTS))if(k.includes(key))return w;
+  return 1.0;
+}
+function channelClass(name){
+  const w=channelWeight(name);
+  if(w>=1.5)return "trusted";
+  if(w>=1.0)return "";
+  return "suspicious";
+}
+function isAltitudeChannel(c){
+  const k=(c||"").replace(/^@/,"").toLowerCase().trim();
+  for(const key of CONFIG.ALTITUDE_CHANNELS)if(k.includes(key))return true;
+  return false;
+}
+function inZone(lat,lon){
+  if(lat==null||lon==null)return false;
+  return haversineKm(CONFIG.KYIV[0],CONFIG.KYIV[1],lat,lon)<=CONFIG.ZONE_RADIUS_KM;
+}
+function inKyivOblast(lat,lon){
+  if(lat==null||lon==null)return false;
+  return haversineKm(CONFIG.KYIV_OBLAST_CENTER[0],CONFIG.KYIV_OBLAST_CENTER[1],lat,lon)<=CONFIG.KYIV_OBLAST_RADIUS_KM;
+}
+function isKyivOrOblast(name){
+  if(!name)return false;
+  const s=String(name).toLowerCase();
+  if(/київ(?!ськ)/.test(s)||/киев(?!ск)/.test(s))return true;
+  if(/київськ|киевск/.test(s))return true;
+  return false;
+}
+function resolveSpeedKmh(type,sampleText){
+  if(sampleText){
+    const low=sampleText.toLowerCase();
+    for(const[hint,spd]of Object.entries(CONFIG.SPEED_BY_HINT)){
+      if(low.includes(hint))return spd;
+    }
+  }
+  return CONFIG.FALLBACK_SPEED[type]||CONFIG.FALLBACK_SPEED.unknown;
+}
+function etaToKyivMin(lat,lon,type,speedOverride){
+  if(lat==null||lon==null)return null;
+  const speed=speedOverride||resolveSpeedKmh(type,"");
+  if(!speed||speed<=0)return null;
+  const d=haversineKm(lat,lon,CONFIG.KYIV[0],CONFIG.KYIV[1]);
+  return d/speed*60;
+}
+function formatEtaMin(min){
+  if(min==null)return"—";
+  if(min<0.5)return"< 1 хв";
+  if(min<60)return`~${Math.round(min)} хв`;
+  const h=Math.floor(min/60),m=Math.round(min%60);
+  return`~${h} год ${m} хв`;
+}
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R=6371,toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function bearingBetween(lat1,lon1,lat2,lon2){
+  const φ1=lat1*Math.PI/180,φ2=lat2*Math.PI/180;
+  const Δλ=(lon2-lon1)*Math.PI/180;
+  const y=Math.sin(Δλ)*Math.cos(φ2);
+  const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return( Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function destPoint(lat,lon,bearingDeg,distKm){
+  const R=6371,br=bearingDeg*Math.PI/180;
+  const lat1=lat*Math.PI/180,lon1=lon*Math.PI/180;
+  const lat2=Math.asin(Math.sin(lat1)*Math.cos(distKm/R)+Math.cos(lat1)*Math.sin(distKm/R)*Math.cos(br));
+  const lon2=lon1+Math.atan2(Math.sin(br)*Math.sin(distKm/R)*Math.cos(lat1),Math.cos(distKm/R)-Math.sin(lat1)*Math.sin(lat2));
+  return[lat2*180/Math.PI,lon2*180/Math.PI];
+}
+function showToast(msg,ms=2200){
+  const t=$("toast");if(!t)return;
+  t.textContent=msg;t.classList.add("show");
+  clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove("show"),ms);
+}
+
+/* UAV colors */
+const UAV_COLORS = [
+  { id:"white",  name:"Білий",     hex:"#ffffff" },
+  { id:"orange", name:"Помаранчевий", hex:"#fb923c" },
+  { id:"yellow", name:"Жовтий",    hex:"#facc15" },
+  { id:"black",  name:"Чорний",    hex:"#1f2937" }
+];
+const UAV_COLOR_KEY = "kyiv_uav_color_v14_21_0";
+let uavColorIdx = 0;
+function loadUavColor(){try{const v=localStorage.getItem(UAV_COLOR_KEY);if(v!=null){const idx=parseInt(v,10);if(idx>=0&&idx<UAV_COLORS.length)uavColorIdx=idx;}}catch(e){}}
+function saveUavColor(){try{localStorage.setItem(UAV_COLOR_KEY,String(uavColorIdx));}catch(e){}}
+function currentUavColor(){return UAV_COLORS[uavColorIdx].hex;}
+const UAV_RECOLOR_TYPES = new Set(["uav","recon","fpv"]);
+const RINGS_KEY = "kyiv_rings_v14_21_0";
+let ringsVisible = true;
+let highPrecisionOnly = false;
+
+/* Ballistic alarm */
+const BALLISTIC_WARN_RE = new RegExp([
+  "підвищен[аоі]\\s+загроз[аи]\\s+балістик","повышенн[ао][а-я]*\\s+угроз[аы]\\s+баллистик",
+  "підвищен[аоі]\\s+загроз[аи]\\s+аеробалістик","загроз[аи]\\s+балістик[иі]\\s+з\\s+",
+  "угроз[аы]\\s+баллистик[и]\\s+с\\s+","увага[!,\\s]+загроз[аи]\\s+балістик",
+  "внимание[!,\\s]+угроз[аы]\\s+баллистик","залп\\s+балістик","залп\\s+баллистик",
+  "пускають\\s+балістик","пускают\\s+баллистик","пуск\\s+балістик[и]?\\s+на\\s+київ",
+  "пуск\\s+баллистик[и]?\\s+на\\s+киев","балістик[аи]?\\s+на\\s+київ","баллистик[аи]?\\s+на\\s+киев",
+  "циркон","zircon","3м22","3m22","аеробалістичн","аэробаллистич"
+].join("|"),"i");
+const BALLISTIC_STRONG_TRIGGER_RE = new RegExp([
+  "залп\\s+балістик","пуск\\s+балістик[и]?\\s+на\\s+київ","пуск\\s+баллистик[и]?\\s+на\\s+киев",
+  "пускають\\s+балістик","пускают\\s+баллистик","балістик[аи]?\\s+на\\s+київ",
+  "баллистик[аи]?\\s+на\\s+киев","циркон","zircon","3м22","3m22"
+].join("|"),"i");
+let lastBallisticAlarmAt = 0;
+function triggerBallisticAlarm(reason){
+  const now=Date.now();
+  if(now-lastBallisticAlarmAt<CONFIG.BALLISTIC_SIREN_COOLDOWN_MS)return false;
+  lastBallisticAlarmAt=now;
+  triggerSirenSequence(3000,3);
+  const banner=$("ballisticBanner");
+  if(banner){banner.classList.add("show");setTimeout(()=>banner.classList.remove("show"),12000);}
+  if("speechSynthesis" in window){
+    try{
+      const u=new SpeechSynthesisUtterance("Увага! Загроза балістики! Перейдіть до укриття!");
+      u.lang="uk-UA";u.rate=0.95;u.pitch=1.05;u.volume=1.0;
+      speechSynthesis.cancel();speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  return true;
+}
+
+/* Threat warnings DB */
+const THREAT_WARNINGS_DB = [
+  {id:"zircon_launch",re:/(?:циркон|zircon|3м22|3m22)/i,altRe:/(?:пуск|залп|курс|на\s+київ|на\s+киев)/i,label:"🚨 ЦИРКОН — пуск/загроза",color:"#dc2626",detail:"Виявлено «Циркон» (3М22). Гіперзвук, ~2500 км/год.",regions:["Київ","Київська"]},
+  {id:"kyiv_ballistic_night",re:/(?:підвищен[аоі]|повышенн[ао])/i,altRe:/(?:балістик|угроз|загроз|київ|киев|іскандер|с-?400|онікс|циркон)/i,label:"🚨 Загроза балістики для Києва",color:"#dc2626",detail:"ОТРК «Іскандер», С-400, «Онікс», «Циркон».",regions:["Київ","Київська"]},
+  {id:"kursk_ballistic",re:/(?:загроз[аи]|угроз[аы])\s+балістик/i,altRe:/(?:курськ|курск)/i,label:"🚨 Балістика з Курська",color:"#dc2626",detail:"Явна загроза балістики з Курської області.",regions:["Курська","Сумська","Чернігівська","Київська"]}
+];
+function detectThreatWarnings(text){
+  if(!text)return[];
+  const found=[];
+  for(const w of THREAT_WARNINGS_DB){
+    if(w.re.test(text)&&(w.altRe?w.altRe.test(text):true))found.push(w);
+  }
+  return found;
+}
+
+/* Impact reports */
+const IMPACT_REPORTS_DB = [
+  {kind:"hit", icon:"💥", label:"Вибух / приліт", color:"#dc2626", re:/(?:прил[іi]т|прилет|влуч[аи]нн|попадан|влучив|вражено|поражен|удар\s+по|бавовн)/i},
+  {kind:"down", icon:"🛬", label:"Падіння", color:"#fb923c", re:/(?:падає|падають|падает|падінн|впав|упал|уламк)/i},
+  {kind:"shot", icon:"🛡️", label:"Збиття", color:"#16a34a", re:/(?:збит[тоя]|сбит[оы]|перехоплен|ліквідован|знищен)/i},
+  {kind:"fire", icon:"🔥", label:"Пожежа", color:"#f97316", re:/(?:пожеж|пожар|горит|задимлен)/i}
+];
+function detectImpactReports(text){
+  if(!text)return[];
+  const found=[];
+  for(const r of IMPACT_REPORTS_DB) if(r.re.test(text)) found.push(r);
+  return found;
+}
+function parseCoordsFromText(text){
+  if(!text)return null;
+  const m=text.match(/(-?\d{2}\.\d{3,8})\s*[,\s]\s*(-?\d{2,3}\.\d{3,8})/);
+  if(!m)return null;
+  const lat=parseFloat(m[1]),lon=parseFloat(m[2]);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return null;
+  return[lat,lon];
+}
+function parseDistanceFromKyiv(text){
+  if(!text)return null;
+  const m=text.match(/(\d{1,3})\s*км\s+(?:від|от)\s+(?:міста|города|києва|киева|київ|киев)/i);
+  if(m){const v=parseInt(m[1],10);if(v>=0&&v<=500)return v;}
+  return null;
+}
+function parseEtaRange(text){
+  if(!text)return null;
+  let m=text.match(/підл[іi]т[:\s]+(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*хв/i);
+  if(m)return[parseInt(m[1],10),parseInt(m[2],10)];
+  m=text.match(/(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*(?:хв|мин)/i);
+  if(m)return[parseInt(m[1],10),parseInt(m[2],10)];
+  return null;
+}
+
+/* Active warnings */
+const activeWarnings = new Map();
+function renderWarningsPanel(){
+  const panel=$("warningsPanel"), list=$("warningsList"), cnt=$("warningsCount");
+  if(!panel||!list||!cnt)return;
+  const items=[...activeWarnings.values()].filter(w=>!w.dismissed);
+  cnt.textContent=String(items.length);
+  if(items.length===0){panel.classList.remove("show");list.innerHTML="";return;}
+  panel.classList.add("show");
+  list.innerHTML=items.map(w=>{
+    const ww=w.warning;
+    const t=new Date(w.lastSeen).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"});
+    return `<div class="w-item" data-warn-id="${esc(ww.id)}">
+      <div class="w-item-body">
+        <div class="w-item-label">${esc(ww.label)}</div>
+        <div class="w-item-detail">${esc(ww.detail)}</div>
+        <div class="w-item-meta">Оновлено: ${t} · Джерел: ${w.channels.size}</div>
+      </div>
+      <button class="w-item-close" data-warn-id="${esc(ww.id)}" title="Прибрати">✕</button>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".w-item-close").forEach(b=>{
+    b.addEventListener("click",(e)=>{e.preventDefault();e.stopPropagation();dismissWarning(b.getAttribute("data-warn-id"));});
+  });
+}
+function dismissWarning(id){
+  const w=activeWarnings.get(id);if(!w)return;
+  w.dismissed=true;
+  if(w.marker&&msgThreatLayer)try{msgThreatLayer.removeLayer(w.marker);}catch(e){}
+  renderWarningsPanel();
+  showToast("⚠️ Прибрано: "+w.warning.label);
+}
+function upsertWarning(ww,ch,msgMs){
+  let w=activeWarnings.get(ww.id);
+  if(!w){
+    w={warning:ww,firstSeen:msgMs,lastSeen:msgMs,channels:new Set(),marker:null,dismissed:false};
+    activeWarnings.set(ww.id,w);
+    playAlertSound(true);
+    if(ww.id==="zircon_launch"||ww.id==="kyiv_ballistic_night"||ww.id==="kursk_ballistic"){
+      triggerBallisticAlarm("warning:"+ww.id);
+    }
+  }
+  w.channels.add(ch);
+  if(msgMs>w.lastSeen)w.lastSeen=msgMs;
+}
+window.__dismissWarning=function(id){dismissWarning(id);};
+
+/* AI Lite */
+const AI=(()=>{
+  const W={channel:.30,confirmations:.25,freshness:.15,hasCoords:.10,hardClassifier:.10,hasTarget:.10};
+  const LEVELS={critical:.75,high:.55,medium:.35};
+  function score(ctx){
+    const now=Date.now();
+    const ageMin=Math.max(0,(now-(ctx.firstSeen||now))/60000);
+    const channels=ctx.channels instanceof Set?ctx.channels:new Set(ctx.channels||[]);
+    const chWeight=[...channels].reduce((s,c)=>s+channelWeight(c),0);
+    const chAvg=channels.size?chWeight/channels.size:0;
+    const chScore=Math.min(chAvg/2,1);
+    const confScore=Math.min(channels.size/4,1);
+    const freshScore=Math.max(0,1-ageMin/30);
+    const geoScore=(ctx.place&&ctx.place.lat!=null)?1:.3;
+    const hardScore=(ctx.cls&&ctx.cls.hard)?1:.4;
+    const targetScore=ctx.target?1:.2;
+    const total=W.channel*chScore+W.confirmations*confScore+W.freshness*freshScore+W.hasCoords*geoScore+W.hardClassifier*hardScore+W.hasTarget*targetScore;
+    let level="low";
+    if(total>=LEVELS.critical)level="critical";
+    else if(total>=LEVELS.high)level="high";
+    else if(total>=LEVELS.medium)level="medium";
+    return{total:Math.round(total*100)/100,level};
+  }
+  const LEVEL_META={
+    critical:{color:"#fecaca",bg:"rgba(220,38,38,.35)",border:"#dc2626",label:"КРИТИЧНО"},
+    high:{color:"#fed7aa",bg:"rgba(234,88,12,.3)",border:"#ea580c",label:"ВИСОКА"},
+    medium:{color:"#fef08a",bg:"rgba(202,138,4,.3)",border:"#ca8a04",label:"СЕРЕДНЯ"},
+    low:{color:"#cbd5e1",bg:"rgba(148,163,184,.2)",border:"#94a3b8",label:"НИЗЬКА"}
+  };
+  function badgeHtml(r){
+    if(!r)return"";
+    const m=LEVEL_META[r.level]||LEVEL_META.low;
+    return `<div class="ai-badge" style="background:${m.bg};color:${m.color};border-color:${m.border}">🤖 ${m.label} · ${Math.round(r.total*100)}%</div>`;
+  }
+  function moderate(text){
+    const t=(text||"").trim();
+    if(!t||t.length<8)return{ok:false,reason:"коротко",spamScore:.8};
+    return{ok:true,reason:"",spamScore:0};
+  }
+  return{score,moderate,badgeHtml,LEVEL_META};
+})();
+
+/* Sound + Siren */
+let audioCtx=null, lastSoundAt=0, keepAliveInterval=null, sirenActiveTimeout=null;
+function initAudio(){
+  if(audioCtx)return audioCtx;
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx)return null;
+    audioCtx=new Ctx();
+    startKeepAlive();
+  }catch(e){audioCtx=null;}
+  return audioCtx;
+}
+function startKeepAlive(){
+  if(keepAliveInterval)return;
+  keepAliveInterval=setInterval(()=>{
+    if(!audioCtx)return;
+    try{
+      if(audioCtx.state==="suspended"){audioCtx.resume().catch(()=>{});return;}
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type="sine";o.frequency.setValueAtTime(1,audioCtx.currentTime);
+      g.gain.setValueAtTime(0.00001,audioCtx.currentTime);
+      o.connect(g);g.connect(audioCtx.destination);
+      o.start();o.stop(audioCtx.currentTime+0.05);
+    }catch(e){}
+  },20000);
+}
+function unlockAudio(){
+  const ctx=initAudio();
+  if(ctx&&ctx.state==="suspended")ctx.resume().catch(()=>{});
+}
+function playBell(){
+  if(!audioCtx)return;
+  const now=audioCtx.currentTime;
+  const partials=[{freq:880,gain:.30,decay:1.1},{freq:1760,gain:.14,decay:.7},{freq:2640,gain:.07,decay:.45}];
+  for(const p of partials){
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type="sine";o.frequency.setValueAtTime(p.freq,now);
+    g.gain.setValueAtTime(.0001,now);
+    g.gain.exponentialRampToValueAtTime(p.gain,now+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,now+p.decay);
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start(now);o.stop(now+p.decay+.05);
+  }
+}
+function playAlertSound(force){
+  if(!CONFIG.SOUND_ENABLED)return;
+  const now=Date.now();
+  if(!force&&now-lastSoundAt<CONFIG.SOUND_COOLDOWN_MS)return;
+  lastSoundAt=now;
+  const ctx=initAudio();
+  if(!ctx)return;
+  try{if(ctx.state==="suspended")ctx.resume();playBell();}catch(e){}
+}
+function playSirenOnce(durationMs){
+  const ctx=initAudio();if(!ctx)return;
+  if(ctx.state==="suspended")ctx.resume();
+  const now=ctx.currentTime, dur=(durationMs||3000)/1000;
+  const o=ctx.createOscillator(), g=ctx.createGain(), filter=ctx.createBiquadFilter();
+  o.type="sawtooth";
+  o.frequency.setValueAtTime(440,now);
+  o.frequency.linearRampToValueAtTime(880,now+dur*0.25);
+  o.frequency.linearRampToValueAtTime(660,now+dur*0.6);
+  o.frequency.linearRampToValueAtTime(440,now+dur);
+  filter.type="bandpass";filter.frequency.setValueAtTime(700,now);
+  filter.frequency.linearRampToValueAtTime(1100,now+dur*0.4);
+  filter.frequency.linearRampToValueAtTime(700,now+dur);
+  filter.Q.setValueAtTime(4,now);
+  g.gain.setValueAtTime(.0001,now);
+  g.gain.linearRampToValueAtTime(.35,now+0.1);
+  g.gain.setValueAtTime(.35,now+dur-0.15);
+  g.gain.linearRampToValueAtTime(.0001,now+dur);
+  o.connect(filter);filter.connect(g);g.connect(ctx.destination);
+  o.start(now);o.stop(now+dur+0.05);
+}
+function flashSirenBtn(durationMs){
+  const btn=$("sirenBtn");if(!btn)return;
+  btn.classList.add("active");
+  if(sirenActiveTimeout)clearTimeout(sirenActiveTimeout);
+  sirenActiveTimeout=setTimeout(()=>btn.classList.remove("active"),durationMs||3000);
+}
+function triggerSirenSequence(durationMs,times){
+  const n=Math.max(1,times||1), dur=durationMs||3000;
+  flashSirenBtn(dur*n+(n-1)*250);
+  for(let i=0;i<n;i++) setTimeout(()=>playSirenOnce(dur),i*(dur+250));
+}
+const firedSoundKeys=new Map();
+function isRocketType(type){return CONFIG.ROCKET_TYPES.has(type);}
+function fireSirenForTarget(key,clsLike){
+  if(!clsLike)return false;
+  if(!CONFIG.SOUND_TYPE_FILTER.has(clsLike.type)&&!clsLike.isGeran5)return false;
+  const now=Date.now();
+  const last=firedSoundKeys.get(key)||0;
+  const win=isRocketType(clsLike.type)?CONFIG.SOUND_NEAR_WINDOW_MS_ROCKET:CONFIG.SOUND_NEAR_WINDOW_MS;
+  if(now-last<win)return false;
+  firedSoundKeys.set(key,now);
+  playAlertSound(true);
+  return true;
+}
+function soundThresholdFor(type){return isRocketType(type)?CONFIG.SOUND_NEAR_KM_ROCKET:CONFIG.SOUND_NEAR_KM;}
+
+/* Places + Classifier */
+const PLACES = {
+  "оболонь":[50.5120,30.5000,"Оболонь"],"подол":[50.4630,30.5150,"Поділ"],
+  "печерськ":[50.4250,30.5400,"Печерськ"],"дарниц":[50.4530,30.6200,"Дарниця"],
+  "троєщин":[50.5150,30.6100,"Троєщина"],"позняки":[50.4110,30.6300,"Позняки"],
+  "осокорки":[50.3929,30.6360,"Осокорки"],"теремки":[50.3666,30.4586,"Теремки"],
+  "академмістец":[50.4640,30.3560,"Академмістечко"],"виноградар":[50.5100,30.4300,"Виноградар"],
+  "нивки":[50.4590,30.4000,"Нивки"],"березняки":[50.4210,30.5960,"Березняки"],
+  "русанівка":[50.4380,30.5940,"Русанівка"],"ірпінь":[50.52,30.25,"Ірпінь"],
+  "буча":[50.55,30.22,"Буча"],"бровари":[50.51,30.79,"Бровари"],
+  "бориспіль":[50.35,30.95,"Бориспіль"],"вишнев":[50.39,30.37,"Вишневе"],
+  "фастів":[50.07,29.92,"Фастів"],"біла церква":[49.79,30.11,"Біла Церква"],
+  "чернігів":[51.50,31.29,"Чернігів"],"суми":[50.91,34.80,"Суми"],
+  "харків":[49.99,36.23,"Харків"],"курск":[51.73,36.19,"Курск"],
+  "белгород":[50.60,36.59,"Белгород"],"брянск":[53.25,34.37,"Брянск"]
+};
+const PLACE_KEYS_BY_LEN=Object.keys(PLACES).sort((a,b)=>b.length-a.length);
+const KYIV_AREA_KEYS=(()=>{
+  const keys=[];
+  for(const area of kyivAreas){
+    keys.push({key:area.name.toLowerCase(),area});
+    if(area.id)keys.push({key:area.id.toLowerCase(),area});
+  }
+  const seen=new Set();const uniq=[];
+  for(const k of keys){if(seen.has(k.key))continue;seen.add(k.key);uniq.push(k);}
+  return uniq.sort((a,b)=>b.key.length-a.key.length);
+})();
+function findKyivAreaInText(text){
+  const low=(text||"").toLowerCase().replace(/[’`´']/g,"'");
+  let best=null;
+  for(const{key,area}of KYIV_AREA_KEYS){
+    if(key.length<3)continue;
+    const idx=low.indexOf(key);
+    if(idx<0)continue;
+    if(!best||idx<best.index||(idx===best.index&&key.length>best.length)){
+      best={key:"kyiv_area:"+area.id,name:area.name,lat:area.lat,lon:area.lng,index:idx,length:key.length,_kyivArea:area};
+    }
+  }
+  return best;
+}
+function findPlaceInText(text){
+  const extra=findExtraPlace(text);
+  if(extra)return extra;
+  const kyiv=findKyivAreaInText(text);
+  if(kyiv)return kyiv;
+  const low=(text||"").toLowerCase().replace(/[’`´']/g,"'");
+  let best=null;
+  for(const key of PLACE_KEYS_BY_LEN){
+    const idx=low.indexOf(key);
+    if(idx<0)continue;
+    if(!best||idx<best.index){
+      best={key,name:PLACES[key][2],lat:PLACES[key][0],lon:PLACES[key][1],index:idx,length:key.length};
+    }
+  }
+  return best;
+}
+
+const CLASSIFIER=(()=>{
+  const HARD_RULES=[
+    {re:/ту-?\s*95|ту-?\s*160|ту-?\s*22|стратег[іи]чн|стратегическ/i,type:"strategic_aviation",label:"Стратег. авіація",isStrategic:true},
+    {re:/циркон|zircon|3м22|3m22/i,type:"zircon",label:"Циркон",isMissile:true,isZircon:true},
+    {re:/реактивн[а-я]*\s*шахед|герань\s*-?\s*[34]\b/i,type:"jet_drone",label:"Реакт. Герань",isMissile:true,isJetDrone:true},
+    {re:/ум[пб]б/i,type:"umpb",label:"УМПБ-5",isMissile:true,isKAB:true},
+    {re:/мгкр|бандерол|s\s*[-]?\s*8000|с\s*[-]?\s*8000/i,type:"banderol",label:"S8000",isMissile:true,isBanderol:true},
+    {re:/балістик|баллистик|кинжал|кінжал|іскандер|искандер|кн-?23|kn-?23/i,type:"ballistic",label:"Бал",isMissile:true},
+    {re:/герань\s*-?\s*5|geran\s*-?\s*5/i,type:"geran5",label:"Герань-5",isMissile:true,isGeran5:true},
+    {re:/каб\b|kab\b|уаб\b/i,type:"kab",label:"КАБ",isMissile:true,isKAB:true},
+    {re:/крилат[аиі]?\s+ракет|х-?\s*101|х-?\s*555|калібр|калибр|kalibr/i,type:"missile",label:"КР",isMissile:true},
+    {re:/миг-?31|міг-?31|mig-?31/i,type:"mig31k",label:"МиГ-31К",isMig:true},
+    {re:/оникс|ониx|oniks|p-?800/i,type:"missile",label:"Оникс",isMissile:true}
+  ];
+  const SOFT_RULES=[
+    {re:/fpv|фпв/i,type:"fpv",label:"FPV"},
+    {re:/шахед|shahed|герань|geran|бпла|дрон|безпілотник|беспилотник/i,type:"uav",label:"БПЛА"},
+    {re:/розвід|развед|recon|розвідувальн/i,type:"recon",label:"Розв"}
+  ];
+  return function classify(text){
+    const t=text||"";
+    for(const r of HARD_RULES)if(r.isZircon&&r.re.test(t))return{...r,hard:true};
+    for(const r of HARD_RULES)if(r.isGeran5&&r.re.test(t))return{...r,hard:true};
+    for(const r of HARD_RULES)if(!r.isGeran5&&!r.isZircon&&r.re.test(t))return{...r,hard:true};
+    for(const r of SOFT_RULES)if(r.re.test(t))return{...r,hard:false};
+    return null;
+  };
+})();
+
+/* Map init */
+let map=null;
+try{
+  map=L.map("map",{center:CONFIG.KYIV,zoom:9,zoomControl:true,attributionControl:true});
+}catch(e){showErr("Leaflet: "+(e&&e.message||e));}
+let osmLayer=null;
+if(map){
+  osmLayer=L.tileLayer(CONFIG.TILE_URL,{maxZoom:19,attribution:CONFIG.TILE_ATTR});
+  osmLayer.addTo(map);
+}
+const threatLayer   = map?L.layerGroup().addTo(map):null;
+const msgThreatLayer= map?L.layerGroup().addTo(map):null;
+const impactLayer   = map?L.layerGroup().addTo(map):null;
+const alertLayer    = map?L.layerGroup().addTo(map):null;
+const baseSat = map?L.layerGroup():null;
+if(map){
+  L.tileLayer(CONFIG.TILE_URL_SAT,{maxZoom:19,attribution:CONFIG.TILE_ATTR_SAT}).addTo(baseSat);
+  L.tileLayer(CONFIG.TILE_URL_SAT_REF,{maxZoom:19,opacity:.9}).addTo(baseSat);
+}
+let currentBase="osm";
+let ringsLayer=null,ring250=null,ring120=null;
+if(map){
+  ringsLayer=L.layerGroup().addTo(map);
+  ring250=L.circle(CONFIG.KYIV,{radius:CONFIG.ZONE_RADIUS_KM*1000,color:"#3b82f6",weight:1.2,opacity:.75,fill:false,dashArray:"6 6",interactive:false});
+  ring120=L.circle(CONFIG.KYIV_OBLAST_CENTER,{radius:CONFIG.KYIV_OBLAST_RADIUS_KM*1000,color:"#dc2626",weight:1.2,opacity:.75,fill:false,dashArray:"6 6",interactive:false});
+  ring250.addTo(ringsLayer);ring120.addTo(ringsLayer);
+}
+
+/* SVG icons */
+function uavSvg(color){
+  const c=color||"#ffffff";
+  const stroke=(c==="#1f2937")?"#f9fafb":"#1a1a1a";
+  return `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><path d="M20 4 L30 22 L24 24 L24 32 L20 30 L16 32 L16 24 L10 22 Z" fill="${c}" stroke="${stroke}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+}
+function rocketSvg(c){return`<svg viewBox="0 0 24 40" xmlns="http://www.w3.org/2000/svg"><path d="M12 1 C14 1 16 6 16 12 L16 26 L19 32 L16 30 L16 34 L12 38 L8 34 L8 30 L5 32 L8 26 L8 12 C8 6 10 1 12 1 Z" fill="${c}" stroke="#1a1a1a" stroke-width="1.1" stroke-linejoin="round"/></svg>`;}
+function zirconSvg(){
+  return `<svg viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg"><path d="M14 1 C17 4 19 9 19 15 L19 26 L23 33 L19 31 L19 36 L14 39 L9 36 L9 31 L5 33 L9 26 L9 15 C9 9 11 4 14 1 Z" fill="#dc2626" stroke="#450a0a" stroke-width="1.3" stroke-linejoin="round"/><circle cx="14" cy="13" r="1.8" fill="#fff"/></svg>`;
+}
+function kabSvg(c){return`<svg viewBox="0 0 36 20" xmlns="http://www.w3.org/2000/svg"><path d="M4 10 C4 6 6 4 10 4 L20 4 L28 2 L32 6 L34 10 L32 14 L28 18 L20 16 L10 16 C6 16 4 14 4 10 Z" fill="${c}" stroke="#1a1a1a" stroke-width="1.2"/></svg>`;}
+
+const TYPE_META={
+  uav:{color:"#ffffff",label:"БПЛА",icon:uavSvg,isUav:true},
+  recon:{color:"#3b82f6",label:"Розв",icon:uavSvg,isUav:true},
+  geran5:{color:"#dc2626",label:"Герань-5",icon:uavSvg,isUav:true,isGeran5:true},
+  fpv:{color:"#ca8a04",label:"FPV",icon:uavSvg},
+  missile:{color:"#dc2626",label:"КР",icon:rocketSvg,isMissile:true},
+  ballistic:{color:"#b91c1c",label:"Бал",icon:rocketSvg,isMissile:true},
+  banderol:{color:"#dc2626",label:"S8000",icon:rocketSvg,isMissile:true},
+  jet_drone:{color:"#b91c1c",label:"Реакт. Герань",icon:rocketSvg,isMissile:true},
+  kab:{color:"#dc2626",label:"КАБ",icon:kabSvg,isMissile:true},
+  umpb:{color:"#7c2d12",label:"УМПБ",icon:kabSvg,isMissile:true},
+  zircon:{color:"#dc2626",label:"Циркон",icon:zirconSvg,isMissile:true,isZircon:true},
+  unknown:{color:"#475569",label:"?",icon:uavSvg,isUav:true}
+};
+const getMeta=t=>TYPE_META[t]||TYPE_META.unknown;
+function typeLabel(threat){
+  if(threat._geran5||threat.type==="geran5")return"Герань-5";
+  if(threat._zircon||threat.type==="zircon")return"Циркон";
+  return getMeta(threat.type).label;
+}
+const SIZE_BASE=28;
+function confirmBadgeClass(count,tw){
+  if(count>=5||tw>=8)return"max";
+  if(count>=3||tw>=4.5)return"strong";
+  if(count>=2&&tw>=2)return"";
+  if(count>=2)return"medium";
+  return"low";
+}
+function confirmBoostClass(count,tw){
+  if(count>=5||tw>=8)return"confirm-5";
+  if(count>=3||tw>=4.5)return"confirm-3";
+  if(count>=2&&tw>=2)return"confirm-2";
+  return"";
+}
+function channelsListHtml(set){
+  const items=[...set].map(ch=>{
+    const cls=channelClass(ch);const w=channelWeight(ch);
+    const label=w>=1.5?`⭐ ${ch}`:w<1?`⚠ ${ch}`:ch;
+    return`<span class="ch ${cls}">${esc(label)}</span>`;
+  });
+  return`<div class="popup-channels"><b>Джерела (${set.size}):</b><br>${items.join(" ")}</div>`;
+}
+function totalWeightOf(set){let w=0;for(const ch of set)w+=channelWeight(ch);return w;}
+function iconColorFor(type){
+  if(UAV_RECOLOR_TYPES.has(type))return currentUavColor();
+  return getMeta(type).color;
+}
+function svgForType(type){
+  const meta=getMeta(type);
+  const col=iconColorFor(type);
+  if(type==="zircon")return zirconSvg();
+  if(type==="kab"||type==="umpb")return kabSvg(col);
+  if(meta.isMissile)return rocketSvg(col);
+  return uavSvg(col);
+}
+function makeIcon(cls,heading,isGuess,confirmations,totalWeight,eta,stale,advisory,areaOnly,uncertain,aiLevel,stage,inSirenZone){
+  const meta=getMeta(cls.type);
+  const svg=svgForType(cls.type);
+  const rot=heading!=null?heading:0;
+  const iconClasses=["threat-icon"];
+  if(cls._falling)iconClasses.push("falling");
+  if(stage==="threat")iconClasses.push("threat-pulse");
+  if(stale)iconClasses.push("stale");
+  if(advisory)iconClasses.push("advisory");
+  if(areaOnly)iconClasses.push("area-only");
+  if(uncertain)iconClasses.push("uncertain");
+  const boost=confirmBoostClass(confirmations,totalWeight);
+  if(boost)iconClasses.push(boost);
+  if(aiLevel==="critical")iconClasses.push("ai-critical");
+  if((cls.type==="ballistic"||cls.type==="zircon")&&(stage==="threat"||stage==="launch"))iconClasses.push("ballistic-alarm");
+  if(inSirenZone&&(cls.type==="uav"||cls.type==="geran5"))iconClasses.push("uav-siren");
+  const arrow=(heading!=null&&!cls._falling&&!areaOnly)?`<div class="dir-arrow"></div>`:"";
+  let confirmHtml="";
+  if(confirmations&&confirmations>=CONFIG.MIN_CHANNELS_CONFIRM){
+    confirmHtml=`<div class="confirm-badge ${confirmBadgeClass(confirmations,totalWeight||0)}">${confirmations}</div>`;
+  }
+  return L.divIcon({
+    className:"",
+    html:`<div class="threat-wrap"><div class="threat-rotate" style="transform:rotate(${rot}deg)"><div class="${iconClasses.join(" ")}">${arrow}${svg}</div></div>${confirmHtml}</div>`,
+    iconSize:[SIZE_BASE,SIZE_BASE],iconAnchor:[SIZE_BASE/2,SIZE_BASE/2],popupAnchor:[0,-SIZE_BASE/2]
+  });
+}
+
+/* Tracks + smoothed extrapolation */
+const tracks=new Map();
+function updateSmoothedState(tr, newLat, newLon, newTime, newHeading) {
+  if (!tr._smooth) {
+    tr._smooth = { lat: newLat, lon: newLon, vx: 0, vy: 0, heading: newHeading||0, lastT: newTime, speed: 0 };
+    return;
+  }
+  const dtH = (newTime - tr._smooth.lastT) / 3600000;
+  if (dtH <= 0 || dtH > 0.5) {
+    tr._smooth.lat = newLat; tr._smooth.lon = newLon; tr._smooth.lastT = newTime;
+    return;
+  }
+  const dist = haversineKm(tr._smooth.lat, tr._smooth.lon, newLat, newLon);
+  const speed = dist / dtH;
+  const brg = bearingBetween(tr._smooth.lat, tr._smooth.lon, newLat, newLon);
+  const alpha = 0.35;
+  tr._smooth.lat = tr._smooth.lat * (1 - alpha) + newLat * alpha;
+  tr._smooth.lon = tr._smooth.lon * (1 - alpha) + newLon * alpha;
+  const rad = brg * Math.PI / 180;
+  const vx = speed * Math.sin(rad), vy = speed * Math.cos(rad);
+  tr._smooth.vx = tr._smooth.vx * 0.6 + vx * 0.4;
+  tr._smooth.vy = tr._smooth.vy * 0.6 + vy * 0.4;
+  tr._smooth.heading = (Math.atan2(tr._smooth.vx, tr._smooth.vy) * 180 / Math.PI + 360) % 360;
+  tr._smooth.lastT = newTime;
+  tr._smooth.speed = Math.hypot(tr._smooth.vx, tr._smooth.vy);
+}
+function predictPosition(tr, now = Date.now()) {
+  if (!tr._smooth) return [tr.baseLat, tr.baseLon];
+  const dtH = Math.min((now - tr._smooth.lastT) / 3600000, CONFIG.EXTRAPOLATION_HOURS);
+  const dist = (tr._smooth.speed || 0) * dtH;
+  return destPoint(tr._smooth.lat, tr._smooth.lon, tr._smooth.heading, dist);
+}
+
+function normalizeThreat(t){
+  const out={...t};
+  const cls=CLASSIFIER([t.type,t.title,t.explanationShort].filter(Boolean).join(" "));
+  if(cls?.isZircon){out.type="zircon";out._zircon=true;}
+  else if(cls?.isGeran5){out.type="geran5";out._geran5=true;}
+  else if(cls&&!TYPE_META[t.type])out.type=cls.type;
+  out._speedKmh=resolveSpeedKmh(out.type,[t.title,t.explanationShort].filter(Boolean).join(" "));
+  out._distanceKm=parseDistanceFromKyiv([t.title,t.explanationShort].filter(Boolean).join(" "));
+  out._etaRange=parseEtaRange([t.title,t.explanationShort].filter(Boolean).join(" "));
+  return out;
+}
+function resolveHeading(t){if(t.heading!=null)return t.heading;if(t.velocity&&t.velocity.bearingDeg!=null)return t.velocity.bearingDeg;return null;}
+function resolveBaseTime(t){const iso=t.confirmedAt||t.updatedAt;if(iso){const ms=Date.parse(iso);if(!isNaN(ms))return ms;}return Date.now();}
+function isStale(bt){return(Date.now()-bt)>CONFIG.STALE_VISUAL_AFTER_HOURS*3600000;}
+
+function upsertThreat(raw){
+  if(!threatLayer)return;
+  try{
+    const t=normalizeThreat(raw);
+    if(t.lat==null||t.lon==null||t.areaOnly)return;
+    if(t.status==="resolved"){removeThreat(t.id,true);return;}
+    if(CONFIG.ROCKET_ONLY_KYIV_OBLAST&&CONFIG.ROCKET_WARNING_TYPES.has(t.type)&&!inKyivOblast(t.lat,t.lon)){removeThreat(t.id,true);return;}
+    if(!inZone(t.lat,t.lon)){removeThreat(t.id,true);return;}
+    const heading=resolveHeading(t);
+    const baseTime=resolveBaseTime(t);
+    const existing=tracks.get(t.id);
+    const uncertain=(t.uncertaintyKm!=null&&t.uncertaintyKm>CONFIG.UNCERTAIN_KM);
+    const advisory=!!t.advisory;
+    const areaOnly=!!t.areaOnly;
+    const speed=t._speedKmh||CONFIG.FALLBACK_SPEED[t.type]||180;
+    const dKyiv=haversineKm(CONFIG.KYIV[0],CONFIG.KYIV[1],t.lat,t.lon);
+    const threshold=soundThresholdFor(t.type);
+    const inSirenZone=dKyiv<=threshold;
+    const eta=etaToKyivMin(t.lat,t.lon,t.type,speed);
+
+    if(existing){
+      updateSmoothedState(existing, t.lat, t.lon, baseTime, heading);
+      existing.threat=t;existing.baseLat=t.lat;existing.baseLon=t.lon;existing.baseTime=baseTime;
+      existing.heading=heading;existing.advisory=advisory;existing.areaOnly=areaOnly;
+      existing.uncertain=uncertain;existing.speed=speed;existing.inSirenZone=inSirenZone;existing.eta=eta;
+      const st=isStale(baseTime);existing.stale=st;
+      const conf = existing._msgConfirm || 0;
+      const tw = existing._msgChannels ? totalWeightOf(existing._msgChannels) : 0;
+      existing.marker.setIcon(makeIcon(t,heading,false,conf,tw,eta,st,advisory,areaOnly,uncertain,null,null,inSirenZone));
+      if (uncertain || t.uncertaintyKm > 3) showUncertainty("api:"+t.id, t.lat, t.lon, t.uncertaintyKm||5);
+      else removeUncertainty("api:"+t.id);
+      if(CONFIG.SOUND_ENABLED&&CONFIG.SOUND_TYPE_FILTER.has(t.type)&&inSirenZone) fireSirenForTarget("api:"+t.type+":"+t.id,t);
+    }else{
+      let estHeading=heading;
+      if(estHeading==null){estHeading=bearingBetween(51.73,36.19,t.lat,t.lon);}
+      const st=isStale(baseTime);
+      const marker=L.marker([t.lat,t.lon],{icon:makeIcon(t,estHeading,false,0,0,eta,st,advisory,areaOnly,uncertain,null,null,inSirenZone)});
+      marker.bindPopup(`<div class="popup-title type-${t.type}">${esc(typeLabel(t))}</div><div>${esc(t.explanationShort||t.title||"")}</div>`);
+      marker.addTo(threatLayer);
+      const tr={marker,threat:t,baseLat:t.lat,baseLon:t.lon,baseTime,heading:estHeading,eta,stale:st,advisory,areaOnly,uncertain,speed,inSirenZone,history:[{lat:t.lat,lon:t.lon,t:baseTime}],trailLine:null,arrivalDone:false,_sirenFired:inSirenZone};
+      updateSmoothedState(tr, t.lat, t.lon, baseTime, estHeading);
+      tracks.set(t.id, tr);
+      if (uncertain || t.uncertaintyKm > 3) showUncertainty("api:"+t.id, t.lat, t.lon, t.uncertaintyKm||5);
+      if(CONFIG.SOUND_ENABLED&&CONFIG.SOUND_TYPE_FILTER.has(t.type)&&inSirenZone)fireSirenForTarget("api:"+t.type+":"+t.id,t);
+      if(t.type==="ballistic"||t.type==="zircon") triggerBallisticAlarm("api-track:"+t.id);
+    }
+    applyHighPrecisionFilter();
+  }catch(e){console.warn("upsertThreat",e);removeThreat(raw?.id,true);}
+}
+function removeThreat(id,silent){
+  const tr=tracks.get(id);if(!tr)return;
+  try{if(threatLayer)threatLayer.removeLayer(tr.marker);}catch(e){}
+  removeUncertainty("api:"+id);
+  tracks.delete(id);
+}
+function syncThreats(list){
+  const seen=new Set();
+  for(const t of list){seen.add(t.id);upsertThreat(t);}
+  for(const id of[...tracks.keys()])if(!seen.has(id))removeThreat(id,true);
+}
+
+/* Merge API + msg */
+function findClosestApiTrack(lat, lon, type, maxDistKm = 18, maxAgeMs = 12 * 60 * 1000) {
+  let best = null, bestD = Infinity;
+  const now = Date.now();
+  for (const tr of tracks.values()) {
+    if (tr.threat.type !== type && !(type === "uav" && (tr.threat.type === "geran5" || tr.threat.type === "recon"))) continue;
+    if (now - tr.baseTime > maxAgeMs) continue;
+    const ll = tr.marker.getLatLng();
+    if (!ll) continue;
+    const d = haversineKm(lat, lon, ll.lat, ll.lng);
+    if (d < bestD && d <= maxDistKm) { bestD = d; best = tr; }
+  }
+  return best ? { track: best, dist: bestD } : null;
+}
+function tryMergeWithApi(key, cls, lat, lon, confirmN, channels) {
+  const found = findClosestApiTrack(lat, lon, cls.type);
+  if (!found) return false;
+  const tr = found.track;
+  tr._msgConfirm = (tr._msgConfirm || 0) + confirmN;
+  tr._msgChannels = tr._msgChannels || new Set();
+  for (const ch of channels) tr._msgChannels.add(ch);
+  if (found.dist > 1.5) {
+    const newLat = lat * 0.65 + tr.baseLat * 0.35;
+    const newLon = lon * 0.65 + tr.baseLon * 0.35;
+    tr.baseLat = newLat; tr.baseLon = newLon;
+    tr.marker.setLatLng([newLat, newLon]);
+    updateSmoothedState(tr, newLat, newLon, Date.now(), tr.heading);
+  }
+  const totalW = totalWeightOf(tr._msgChannels);
+  tr.marker.setIcon(makeIcon(tr.threat, tr.heading, false, Math.max(2, tr._msgConfirm), totalW, tr.eta, tr.stale, tr.advisory, tr.areaOnly, tr.uncertain, null, null, tr.inSirenZone));
+  return true;
+}
+
+/* Message processing */
+const msgMarkers=new Map();
+const impactMarkers=new Map();
+const trails=new Map();
+const impactReports=new Map();
+
+function processMessages(messages){
+  const now=Date.now();
+  for(const m of (messages||[])){
+    const text=m.text||"";
+    const ch=(m.channel||"unknown").replace(/^@/,"").toLowerCase();
+    const msgMs=m.date?Date.parse(m.date):now;
+    if(!AI.moderate(text).ok)continue;
+    if(BALLISTIC_WARN_RE.test(text)&&BALLISTIC_STRONG_TRIGGER_RE.test(text)) triggerBallisticAlarm("msg:"+ch);
+    const warns=detectThreatWarnings(text);
+    for(const w of warns) upsertWarning(w,ch,msgMs);
+
+    // Impact
+    const reports=detectImpactReports(text);
+    if(reports.length){
+      const report=reports[0];
+      let place=null;
+      const coords=parseCoordsFromText(text);
+      if(coords) place={key:"coords:"+coords[0].toFixed(4),name:"Точка",lat:coords[0],lon:coords[1]};
+      else place=findPlaceFuzzy(text)||findPlaceInText(text);
+      if(place&&inZone(place.lat,place.lon)&&report.kind!=="clear"){
+        const key=`impact|${report.kind}|${place.key}`;
+        if(!impactReports.has(key)){
+          impactReports.set(key,{report,lat:place.lat,lon:place.lon,name:place.name,lastSeen:msgMs,channels:new Set()});
+          playAlertSound(true);
+        }
+        impactReports.get(key).channels.add(ch);
+        impactReports.get(key).lastSeen=msgMs;
+      }
+    }
+
+    // Place + type
+    const cls=CLASSIFIER(text);
+    if(!cls)continue;
+    let place=findPlaceFuzzy(text)||findPlaceInText(text);
+    if(!place||!inZone(place.lat,place.lon))continue;
+    if(CONFIG.ROCKET_ONLY_KYIV_OBLAST&&CONFIG.ROCKET_WARNING_TYPES.has(cls.type)&&!inKyivOblast(place.lat,place.lon))continue;
+
+    const key=`msg|${place.key}|${cls.type}`;
+    const confirmN=1;
+    const channels=new Set([ch]);
+    const aiResult=AI.score({channels,firstSeen:msgMs,place,cls});
+    const speed=resolveSpeedKmh(cls.type,text);
+    const eta=etaToKyivMin(place.lat,place.lon,cls.type,speed);
+    const threshold=soundThresholdFor(cls.type);
+    const inSirenZone=haversineKm(CONFIG.KYIV[0],CONFIG.KYIV[1],place.lat,place.lon)<=threshold;
+
+    if(msgMarkers.has(key)){
+      const o=msgMarkers.get(key);
+      o.lastSeen=msgMs;
+      o.channels.add(ch);
+      o.confirmN=(o.confirmN||1)+1;
+    }else{
+      const marker=L.marker([place.lat,place.lon],{
+        icon:makeIcon(cls,null,false,1,channelWeight(ch),eta,false,false,false,!!place._fuzzy,aiResult.level,null,inSirenZone),
+        zIndexOffset:900
+      });
+      let popupHtml=`<div class="popup-title type-${cls.type}">${esc(cls.label)}</div>
+        <div>${esc(place.name)}</div>`;
+      if(place._fuzzy) popupHtml+=`<div class="popup-guess">Fuzzy score: ${place.fuzzyScore}</div>`;
+      popupHtml+=`<div class="popup-meta">Джерело: ${esc(ch)}</div>`;
+      if(eta!=null) popupHtml+=`<div class="popup-eta">⏱ Підліт: ${formatEtaMin(eta)}</div>`;
+      marker.bindPopup(popupHtml);
+      marker.addTo(msgThreatLayer);
+      msgMarkers.set(key,{marker,lastSeen:msgMs,firstSeen:msgMs,cls,place,confirmN:1,channels,eta,inSirenZone});
+      if(place._fuzzy) showUncertainty(key, place.lat, place.lon, 4);
+      tryMergeWithApi(key, cls, place.lat, place.lon, 1, channels);
+      if((cls.type==="ballistic"||cls.type==="zircon")) triggerBallisticAlarm("msg-place:"+key);
+      if(inSirenZone) fireSirenForTarget("msg:"+cls.type+":"+key,cls);
+    }
+  }
+  // cleanup
+  for(const[key,o]of[...msgMarkers]){
+    if(now-o.lastSeen>CONFIG.STALE_MSG_MS){
+      if(o.marker&&msgThreatLayer)msgThreatLayer.removeLayer(o.marker);
+      removeUncertainty(key);
+      msgMarkers.delete(key);
+    }
+  }
+  for(const[id,w]of[...activeWarnings]){
+    if(w.lastSeen<now-CONFIG.WARNING_GRACE_MS){
+      if(w.marker&&msgThreatLayer)try{msgThreatLayer.removeLayer(w.marker);}catch(e){}
+      activeWarnings.delete(id);
+    }
+  }
+  renderWarningsPanel();
+  applyHighPrecisionFilter();
+}
+
+/* High precision filter */
+function isHighPrecision(o) {
+  if (o.threat) {
+    return !o.uncertain && !o.advisory && !o.areaOnly && ((o._msgConfirm||0) >= 2 || !o.threat.uncertaintyKm || o.threat.uncertaintyKm < 5);
+  }
+  return (o.confirmN||0) >= 2 || (o.channels&&o.channels.size>=2);
+}
+function applyHighPrecisionFilter(){
+  for(const tr of tracks.values()){
+    const show = !highPrecisionOnly || isHighPrecision(tr);
+    if(show){ if(!threatLayer.hasLayer(tr.marker)) tr.marker.addTo(threatLayer); }
+    else { if(threatLayer.hasLayer(tr.marker)) threatLayer.removeLayer(tr.marker); }
+  }
+  for(const o of msgMarkers.values()){
+    const show = !highPrecisionOnly || isHighPrecision(o);
+    if(show){ if(!msgThreatLayer.hasLayer(o.marker)) o.marker.addTo(msgThreatLayer); }
+    else { if(msgThreatLayer.hasLayer(o.marker)) msgThreatLayer.removeLayer(o.marker); }
+  }
+}
+
+/* Animation with smoothed prediction */
+let rafId=null, animRunning=false;
+function animate(){
+  if(!animRunning||!map)return;
+  const now=Date.now();
+  for(const tr of tracks.values()){
+    if(tr.heading==null||tr.threat._falling||tr.threat.areaOnly||tr.threat.advisory)continue;
+    const [lat, lon] = predictPosition(tr, now);
+    if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
+    tr.marker.setLatLng([lat,lon]);
+    const etaNow=etaToKyivMin(lat,lon,tr.threat.type,tr.speed);
+    if(etaNow!=null)tr.eta=etaNow;
+    if(CONFIG.SOUND_ENABLED&&CONFIG.SOUND_TYPE_FILTER.has(tr.threat.type)){
+      const d=haversineKm(CONFIG.KYIV[0],CONFIG.KYIV[1],lat,lon);
+      const threshold=soundThresholdFor(tr.threat.type);
+      if(d<=threshold&&!tr._sirenFired){tr._sirenFired=true;fireSirenForTarget("api:"+tr.threat.type+":"+tr.threat.id,tr.threat);}
+    }
+    const dKyiv=haversineKm(lat,lon,CONFIG.KYIV[0],CONFIG.KYIV[1]);
+    if(dKyiv<1&&!tr.arrivalDone){
+      tr.arrivalDone=true;
+      setTimeout(()=>removeThreat(tr.threat.id,true),CONFIG.TARGET_TTL_AFTER_ARRIVAL_MS);
+    }
+  }
+  rafId=requestAnimationFrame(animate);
+}
+function startAnim(){if(animRunning)return;animRunning=true;rafId=requestAnimationFrame(animate);}
+function stopAnim(){animRunning=false;if(rafId){cancelAnimationFrame(rafId);rafId=null;}}
+
+/* AI Summary */
+function buildSituationSummary(){
+  const lines=[];
+  if(Date.now()-lastBallisticAlarmAt<5*60*1000){
+    lines.push(`🚨 АКТИВНА ТРИВОГА БАЛІСТИКИ`);
+    lines.push("");
+  }
+  lines.push(lastAlerts ? "ℹ Дані про тривоги завантажено" : "ℹ Немає даних про офіційні тривоги");
+  const warnArr=[...activeWarnings.values()].filter(w=>!w.dismissed);
+  if(warnArr.length>0){
+    lines.push("");lines.push(`⚠️ Попереджень: ${warnArr.length}`);
+    for(const w of warnArr)lines.push(`   • ${w.warning.label}`);
+  }
+  const allTargets=[];
+  for(const tr of tracks.values()){
+    if(tr.threat.areaOnly||tr.threat.advisory)continue;
+    const ll=tr.marker.getLatLng();if(!ll)continue;
+    const d=haversineKm(CONFIG.KYIV[0],CONFIG.KYIV[1],ll.lat,ll.lng);
+    allTargets.push({label:typeLabel(tr.threat),name:tr.threat.locality||tr.threat.region||"—",dist:d,eta:tr.eta});
+  }
+  for(const o of msgMarkers.values()){
+    if(!o.marker)continue;
+    const ll=o.marker.getLatLng();if(!ll)continue;
+    const d=haversineKm(CONFIG.KYIV[0],CONFIG.KYIV[1],ll.lat,ll.lng);
+    allTargets.push({label:o.cls?.label||"об'єкт",name:o.place?.name||"?",dist:d,eta:o.eta});
+  }
+  lines.push("");
+  if(allTargets.length===0)lines.push("✈ Цілей у зоні: немає");
+  else{
+    lines.push(`🎯 Цілей у зоні: ${allTargets.length}`);
+    allTargets.sort((a,b)=>a.dist-b.dist);
+    for(const t of allTargets.slice(0,8)){
+      lines.push(`   • ${t.label} — ${t.name} · ${Math.round(t.dist)} км${t.eta!=null?` · ⏱ ${formatEtaMin(t.eta)}`:""}`);
+    }
+  }
+  return lines.join("\n");
+}
+function showAIExplain(){
+  const text=buildSituationSummary();
+  $("aiModalBody").textContent=text;
+  $("aiModalTime").textContent="Оновлено: "+new Date().toLocaleTimeString("uk-UA");
+  $("aiModalBackdrop").classList.add("show");
+}
+function hideAIExplain(){$("aiModalBackdrop").classList.remove("show");}
+
+/* WebSocket + REST */
+let ws=null,wsConnected=false,wsReconnectMs=CONFIG.WS_RECONNECT_MS,wsReconnectTimer=null;
+let restFallbackActive=false,pollTimer=null,abortCtrl=null;
+const wsState={threats:new Map(),alerts:null};
+let lastAlerts=null;
+function wsScheduleReconnect(){
+  if(wsReconnectTimer)return;
+  wsReconnectTimer=setTimeout(()=>{wsReconnectTimer=null;wsConnect();},wsReconnectMs);
+  wsReconnectMs=Math.min(wsReconnectMs*2,CONFIG.WS_RECONNECT_MAX_MS);
+}
+function wsConnect(){
+  try{
+    if(ws){try{ws.close();}catch(e){}ws=null;}
+    ws=new WebSocket(CONFIG.WS_URL);
+    ws.onopen=()=>{wsConnected=true;wsReconnectMs=CONFIG.WS_RECONNECT_MS;restFallbackActive=false;stopRestPolling();updateLiveBadge("ok");};
+    ws.onmessage=(e)=>{try{wsHandleFrame(JSON.parse(e.data));}catch(err){}};
+    ws.onerror=()=>{};
+    ws.onclose=()=>{
+      wsConnected=false;ws=null;updateLiveBadge("err");
+      if(!restFallbackActive){restFallbackActive=true;startRestPolling();}
+      wsScheduleReconnect();
+    };
+  }catch(e){if(!restFallbackActive){restFallbackActive=true;startRestPolling();}wsScheduleReconnect();}
+}
+function wsHandleFrame(env){
+  if(!env||!env.type)return;
+  switch(env.type){
+    case "snapshot":{
+      const data=env.data||{};
+      wsState.threats.clear();
+      for(const t of (data.threats||[]))if(t.id)wsState.threats.set(t.id,t);
+      if(data.alerts){wsState.alerts=data.alerts;lastAlerts=data.alerts;}
+      applyThreatsFromWs();break;
+    }
+    case "upsert":{const t=env.data;if(t&&t.id){wsState.threats.set(t.id,t);applyThreatsFromWs();}break;}
+    case "remove":{const data=env.data||{};if(data.id)wsState.threats.delete(data.id);applyThreatsFromWs();break;}
+    case "alerts":{const data=env.data||{};wsState.alerts=data;lastAlerts=data;break;}
+  }
+}
+function applyThreatsFromWs(){try{syncThreats([...wsState.threats.values()]);}catch(e){}}
+async function fetchMessages(){
+  try{
+    const r=await fetch(CONFIG.API_MESSAGES);
+    if(!r.ok)throw new Error("messages "+r.status);
+    const data=await r.json();
+    processMessages(data.messages||[]);
+  }catch(e){}
+}
+async function fetchThreatsAndAlerts(){
+  try{
+    if(abortCtrl)abortCtrl.abort();
+    abortCtrl=new AbortController();
+    const signal=abortCtrl.signal;
+    const[tr,al]=await Promise.all([
+      fetch(CONFIG.API_THREATS,{signal}).then(r=>{if(!r.ok)throw new Error("threats "+r.status);return r.json();}),
+      fetch(CONFIG.API_ALERTS,{signal}).then(r=>{if(!r.ok)throw new Error("alerts "+r.status);return r.json();})
+    ]);
+    try{syncThreats(tr.threats||[]);}catch(e){}
+    lastAlerts=al;
+    updateLiveBadge("ok");
+  }catch(e){if(e.name!=="AbortError")updateLiveBadge("err");}
+}
+async function restPollLoop(){await fetchThreatsAndAlerts();await fetchMessages();pollTimer=setTimeout(restPollLoop,CONFIG.POLL_MS);}
+function startRestPolling(){if(pollTimer)clearTimeout(pollTimer);restPollLoop();}
+function stopRestPolling(){if(pollTimer){clearTimeout(pollTimer);pollTimer=null;}if(abortCtrl){abortCtrl.abort();abortCtrl=null;}}
+function updateLiveBadge(state){
+  const badge=$("liveBadge");if(!badge)return;
+  if(state==="ok"){badge.textContent=wsConnected?"онлайн · WS":"онлайн";badge.className="live-badge live"+(wsConnected?" ws":"");}
+  else if(state==="err"){badge.textContent="помилка";badge.className="live-badge stale";}
+}
+
+/* UI */
+function clearAll(){
+  msgMarkers.forEach(o=>{if(o.marker&&msgThreatLayer)try{msgThreatLayer.removeLayer(o.marker);}catch(e){}});
+  msgMarkers.clear();
+  impactMarkers.forEach(o=>{if(o.marker&&impactLayer)try{impactLayer.removeLayer(o.marker);}catch(e){}});
+  impactMarkers.clear();
+  tracks.forEach(tr=>{if(tr.marker&&threatLayer)try{threatLayer.removeLayer(tr.marker);}catch(e){}});
+  tracks.clear();
+  for(const key of uncertaintyCircles.keys()) removeUncertainty(key);
+  activeWarnings.clear();
+  impactReports.clear();
+  renderWarningsPanel();
+}
+function refreshAllIcons(){
+  for(const tr of tracks.values()){
+    try{
+      const conf = tr._msgConfirm || 0;
+      const tw = tr._msgChannels ? totalWeightOf(tr._msgChannels) : 0;
+      tr.marker.setIcon(makeIcon(tr.threat,tr.heading,false,conf,tw,tr.eta,tr.stale,tr.advisory,tr.areaOnly,tr.uncertain,null,null,tr.inSirenZone));
+    }catch(e){}
+  }
+}
+
+$("btnRefresh").addEventListener("click",()=>{
+  unlockAudio();
+  if(wsConnected&&ws){try{ws.close();}catch(e){}wsConnect();}
+  else startRestPolling();
+  showToast("Оновлення…");
+});
+$("btnClear").addEventListener("click",()=>{unlockAudio();clearAll();showToast("Очищено");});
+$("btnAIExplain").addEventListener("click",()=>{unlockAudio();showAIExplain();});
+
+(function initSoundToggle(){
+  const btn=$("soundToggle");if(!btn)return;
+  function updateBtn(){btn.textContent=CONFIG.SOUND_ENABLED?"🔔":"🔕";btn.className="sound-btn "+(CONFIG.SOUND_ENABLED?"on":"muted");}
+  updateBtn();
+  let lastTap=0;
+  btn.addEventListener("click",(e)=>{
+    e.preventDefault();e.stopPropagation();unlockAudio();
+    const now=Date.now();
+    playAlertSound(true);
+    if(now-lastTap<500){CONFIG.SOUND_ENABLED=!CONFIG.SOUND_ENABLED;updateBtn();showToast(CONFIG.SOUND_ENABLED?"🔔 увімк":"🔕 вимк");lastTap=0;}
+    else{lastTap=now;showToast("🔔 Тест");}
+  });
+})();
+(function initSirenBtn(){
+  const btn=$("sirenBtn");if(!btn)return;
+  let lastTap=0;
+  btn.addEventListener("click",(e)=>{
+    e.preventDefault();e.stopPropagation();unlockAudio();
+    const now=Date.now();
+    if(now-lastTap<500){triggerSirenSequence(3000,3);showToast("🚨 3× сирена");lastTap=0;}
+    else{playSirenOnce(3000);flashSirenBtn(3000);showToast("🚨 1× сирена 3 сек");lastTap=now;}
+  });
+})();
+(function initColorToggle(){
+  const btn=$("btnColorToggle");if(!btn)return;
+  function updateBtn(){
+    const c=UAV_COLORS[uavColorIdx];
+    btn.style.background=c.hex;
+    btn.style.borderColor=(c.id==="white")?"rgba(148,163,184,.5)":"rgba(0,0,0,.35)";
+    btn.style.color=(c.id==="white"||c.id==="yellow")?"#1e293b":"#fff";
+    btn.title="Колір БПЛА: "+c.name;
+  }
+  updateBtn();
+  btn.addEventListener("click",(e)=>{
+    e.preventDefault();e.stopPropagation();
+    uavColorIdx=(uavColorIdx+1)%UAV_COLORS.length;
+    saveUavColor();updateBtn();refreshAllIcons();
+    showToast("🎨 БПЛА: "+UAV_COLORS[uavColorIdx].name);
+    unlockAudio();
+  });
+})();
+(function initRingsToggle(){
+  const btn=$("btnRingsToggle");if(!btn||!map)return;
+  try{const v=localStorage.getItem(RINGS_KEY);if(v==="0")ringsVisible=false;}catch(e){}
+  function apply(){
+    if(ringsVisible){if(!map.hasLayer(ringsLayer))ringsLayer.addTo(map);btn.classList.add("on");btn.classList.remove("off");}
+    else{if(map.hasLayer(ringsLayer))map.removeLayer(ringsLayer);btn.classList.add("off");btn.classList.remove("on");}
+  }
+  apply();
+  btn.addEventListener("click",(e)=>{
+    e.preventDefault();e.stopPropagation();
+    ringsVisible=!ringsVisible;
+    try{localStorage.setItem(RINGS_KEY,ringsVisible?"1":"0");}catch(e2){}
+    apply();showToast(ringsVisible?"🎯 Кола УВІМК":"🎯 Кола ВИМК");
+    unlockAudio();
+  });
+})();
+(function initHighPrec(){
+  const btn=$("btnHighPrec");if(!btn)return;
+  btn.addEventListener("click",(e)=>{
+    e.preventDefault();e.stopPropagation();
+    highPrecisionOnly=!highPrecisionOnly;
+    btn.classList.toggle("on",highPrecisionOnly);
+    applyHighPrecisionFilter();
+    showToast(highPrecisionOnly?"🎯+ Тільки висока точність":"🎯+ Усі цілі");
+    unlockAudio();
+  });
+})();
+(function initBasemapToggle(){
+  const btn=$("btnMapToggle");if(!btn||!map)return;
+  btn.addEventListener("click",(e)=>{
+    e.preventDefault();e.stopPropagation();unlockAudio();
+    if(currentBase==="osm"){
+      if(osmLayer)map.removeLayer(osmLayer);
+      baseSat.addTo(map);currentBase="sat";btn.classList.add("on");showToast("🛰 Супутник");
+    }else{
+      map.removeLayer(baseSat);
+      osmLayer=L.tileLayer(CONFIG.TILE_URL,{maxZoom:19,attribution:CONFIG.TILE_ATTR});
+      osmLayer.addTo(map);currentBase="osm";btn.classList.remove("on");showToast("🗺 Схема");
+    }
+  });
+})();
+(function initWarningsPanelToggle(){
+  const panel=$("warningsPanel"),header=$("warningsHeader");
+  if(!panel||!header)return;
+  header.addEventListener("click",()=>{panel.classList.toggle("collapsed");});
+})();
+(function initAIModal(){
+  const backdrop=$("aiModalBackdrop");
+  if(!backdrop)return;
+  backdrop.addEventListener("click",(e)=>{if(e.target===backdrop)hideAIExplain();});
+  $("aiModalClose")?.addEventListener("click",hideAIExplain);
+  document.addEventListener("keydown",(e)=>{if(e.key==="Escape"&&backdrop.classList.contains("show"))hideAIExplain();});
+  $("aiModalCopy")?.addEventListener("click",async()=>{
+    try{await navigator.clipboard.writeText($("aiModalBody").textContent||"");showToast("✅ Скопійовано");}catch(e){}
+  });
+})();
+
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){stopRestPolling();stopAnim();}
+  else{if(!wsConnected)startRestPolling();startAnim();unlockAudio();}
+});
+
+(async function init(){
+  try{
+    loadUavColor();
+    wsConnect();
+    fetchMessages();
+    setInterval(fetchMessages,5000);
+    startAnim();
+    renderWarningsPanel();
+    setTimeout(()=>unlockAudio(),500);
+  }catch(e){showErr("init: "+(e&&e.message||e));}
+})();
+</script>
+</body>
+</html>
